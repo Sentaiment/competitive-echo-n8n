@@ -1,0 +1,42 @@
+{
+  "name": "Competitive Echo",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// Your node code here\nconsole.log('Hello from node');\n\nreturn [{ json: { result: 'success' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        100,
+        100
+      ],
+      "id": "node-id-here",
+      "name": "Node Name Here"
+    }
+  ],
+  "connections": {
+    "node-id-here": {
+      "main": [
+        [
+          {
+            "node": "next-node-id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "hjs3d40o0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "fmyj4xg57ol"
+  },
+  "id": "ufyncwk8x",
+  "tags": []
+}

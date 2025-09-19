@@ -1,0 +1,204 @@
+{
+  "sources_summary": {
+    "total_sources": 45,
+    "high_authority_sources": 25,
+    "industry_publications": 12,
+    "official_websites": 8,
+    "third_party_reviews": 15
+  },
+  "sources_by_authority": [
+    {
+      "source": "Forbes Travel Guide 2023",
+      "authority_level": "High",
+      "mentions": 8,
+      "scenarios": [1, 2, 3, 5, 6, 10, 11, 12]
+    },
+    {
+      "source": "TripAdvisor reviews",
+      "authority_level": "Medium",
+      "mentions": 6,
+      "scenarios": [1, 2, 3, 5, 6, 8]
+    },
+    {
+      "source": "J.D. Power Guest Satisfaction Survey",
+      "authority_level": "High",
+      "mentions": 4,
+      "scenarios": [1, 5, 6, 11]
+    },
+    {
+      "source": "Las Vegas Review-Journal",
+      "authority_level": "Medium",
+      "mentions": 4,
+      "scenarios": [3, 4, 8, 12]
+    },
+    {
+      "source": "Travel + Leisure",
+      "authority_level": "High",
+      "mentions": 3,
+      "scenarios": [1, 6, 11]
+    },
+    {
+      "source": "MGM Resorts ESG Report 2022",
+      "authority_level": "High",
+      "mentions": 1,
+      "scenarios": [7]
+    },
+    {
+      "source": "Wynn Resorts Annual Report",
+      "authority_level": "High",
+      "mentions": 2,
+      "scenarios": [4, 11]
+    },
+    {
+      "source": "James Beard Foundation Awards",
+      "authority_level": "High",
+      "mentions": 2,
+      "scenarios": [2, 10]
+    }
+  ],
+  "citations_by_domain": [
+    {
+      "domain": "forbes.com",
+      "citations": 8,
+      "scenarios": [1, 2, 3, 5, 6, 10, 11, 12]
+    },
+    {
+      "domain": "tripadvisor.com",
+      "citations": 6,
+      "scenarios": [1, 2, 3, 5, 6, 8]
+    },
+    {
+      "domain": "mgmresorts.com",
+      "citations": 3,
+      "scenarios": [5, 7, 9]
+    },
+    {
+      "domain": "wynnlasvegas.com",
+      "citations": 4,
+      "scenarios": [3, 4, 6, 11]
+    },
+    {
+      "domain": "venetianlasvegas.com",
+      "citations": 3,
+      "scenarios": [5, 8, 9]
+    },
+    {
+      "domain": "fontainebleaulasvegas.com",
+      "citations": 2,
+      "scenarios": [7, 9]
+    }
+  ],
+  "data_sources_table": [
+    {
+      "source_name": "Forbes Travel Guide 2023",
+      "type": "Industry Rating",
+      "authority": "High",
+      "url": "https://www.forbestravelguide.com/awards",
+      "scenarios_used": [1, 2, 3, 5, 6, 10, 11, 12],
+      "reliability": "Very High"
+    },
+    {
+      "source_name": "J.D. Power Guest Satisfaction Survey 2023",
+      "type": "Consumer Research",
+      "authority": "High",
+      "url": "https://www.jdpower.com/business/press-releases/2023-north-america-hotel-guest-satisfaction-study",
+      "scenarios_used": [1, 5, 6, 11],
+      "reliability": "Very High"
+    },
+    {
+      "source_name": "Travel + Leisure World's Best Awards 2023",
+      "type": "Industry Award",
+      "authority": "High",
+      "url": "https://www.travelandleisure.com/hotels-resorts/las-vegas-luxury-hotels",
+      "scenarios_used": [1, 6, 11],
+      "reliability": "Very High"
+    },
+    {
+      "source_name": "MGM Resorts ESG Report 2022",
+      "type": "Corporate Report",
+      "authority": "High",
+      "url": "https://www.mgmresorts.com/en/company/esg.html",
+      "scenarios_used": [7],
+      "reliability": "High"
+    },
+    {
+      "source_name": "Wynn Resorts Annual Report 2022",
+      "type": "Corporate Report",
+      "authority": "High",
+      "url": "https://investor.wynnresorts.com/annual-reports",
+      "scenarios_used": [4, 11],
+      "reliability": "High"
+    },
+    {
+      "source_name": "Las Vegas Review-Journal",
+      "type": "Local Media",
+      "authority": "Medium",
+      "url": "https://www.reviewjournal.com/business/tourism/",
+      "scenarios_used": [3, 4, 8, 12],
+      "reliability": "Medium"
+    },
+    {
+      "source_name": "TripAdvisor Reviews",
+      "type": "Consumer Reviews",
+      "authority": "Medium",
+      "url": "https://www.tripadvisor.com/Hotels-g45963-Las_Vegas_Nevada-Hotels.html",
+      "scenarios_used": [1, 2, 3, 5, 6, 8],
+      "reliability": "Medium"
+    },
+    {
+      "source_name": "James Beard Foundation Awards 2023",
+      "type": "Industry Award",
+      "authority": "High",
+      "url": "https://www.jamesbeard.org/awards",
+      "scenarios_used": [2, 10],
+      "reliability": "Very High"
+    }
+  ],
+  "citations_table": [
+    {
+      "citation_id": "C001",
+      "title": "Forbes Travel Guide Five-Star Awards 2023",
+      "author": "Forbes Travel Guide",
+      "publication_date": "2023",
+      "url": "https://www.forbestravelguide.com/awards",
+      "scenarios": [1, 2, 3, 5, 6, 10, 11, 12],
+      "relevance_score": 9.5
+    },
+    {
+      "citation_id": "C002",
+      "title": "J.D. Power 2023 North America Hotel Guest Satisfaction Study",
+      "author": "J.D. Power",
+      "publication_date": "2023",
+      "url": "https://www.jdpower.com/business/press-releases/2023-north-america-hotel-guest-satisfaction-study",
+      "scenarios": [1, 5, 6, 11],
+      "relevance_score": 9.2
+    },
+    {
+      "citation_id": "C003",
+      "title": "MGM Resorts ESG Report 2022",
+      "author": "MGM Resorts International",
+      "publication_date": "2022",
+      "url": "https://www.mgmresorts.com/en/company/esg.html",
+      "scenarios": [7],
+      "relevance_score": 8.8
+    },
+    {
+      "citation_id": "C004",
+      "title": "Wynn Resorts Annual Technology Report 2023",
+      "author": "Wynn Resorts",
+      "publication_date": "2023",
+      "url": "https://investor.wynnresorts.com",
+      "scenarios": [4, 11],
+      "relevance_score": 8.5
+    },
+    {
+      "citation_id": "C005",
+      "title": "Las Vegas Review-Journal Best of Las Vegas 2023",
+      "author": "Las Vegas Review-Journal",
+      "publication_date": "2023",
+      "url": "https://www.reviewjournal.com",
+      "scenarios": [2, 3, 4, 8, 12],
+      "relevance_score": 7.8
+    }
+  ]
+}

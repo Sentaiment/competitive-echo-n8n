@@ -1,0 +1,24 @@
+{
+  "node": {
+    "parameters": {
+      "jsCode": "// Your node code here\nconsole.log('Hello from node');\n\nreturn [{ json: { result: 'success' } }];"
+    },
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [100, 100],
+    "id": "node-id-here",
+    "name": "Node Name Here"
+  },
+  "connections": [
+    {
+      "source": "node-id-here",
+      "target": "next-node-id"
+    }
+  ],
+  "metadata": {
+    "description": "Description of what this node does",
+    "category": "data-processing",
+    "author": "Your Name",
+    "version": "1.0.0"
+  }
+}

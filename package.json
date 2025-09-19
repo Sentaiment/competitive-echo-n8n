@@ -1,0 +1,27 @@
+{
+  "name": "competitive-echo-n8n",
+  "version": "1.0.0",
+  "description": "Competitive Intelligence Analysis Workflow for n8n",
+  "main": "build-workflow.js",
+  "scripts": {
+    "build": "echo 'Static files - no build needed'",
+    "watch": "node build-workflow.js --watch",
+    "dev": "npm run watch",
+    "setup": "npm install && git add . && git commit -m 'Initial setup'",
+    "workflow:build": "node build-workflow.js"
+  },
+  "keywords": [
+    "n8n",
+    "competitive-intelligence",
+    "workflow",
+    "automation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "chokidar": "^3.5.3"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
