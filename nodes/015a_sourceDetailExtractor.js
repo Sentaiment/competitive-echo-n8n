@@ -11,11 +11,32 @@ console.log("Input data type:", typeof inputData);
 console.log("Input data keys:", Object.keys(inputData || {}));
 console.log("Has scenario_rankings:", !!inputData?.scenario_rankings);
 console.log("Has scenarios:", !!inputData?.scenarios);
+console.log("Has results:", !!inputData?.results);
 console.log("Is array:", Array.isArray(inputData));
 
 // Extract source references from competitive analysis scenarios
 const sourceReferences = [];
 let scenarios = [];
+
+// Handle the actual data structure from 012_formatPrompt32
+if (inputData.results && Array.isArray(inputData.results)) {
+  console.log("Processing results array from 012_formatPrompt32");
+  scenarios = inputData.results;
+} else if (inputData.scenarios && Array.isArray(inputData.scenarios)) {
+  console.log("Processing scenarios array");
+  scenarios = inputData.scenarios;
+} else if (
+  inputData.scenario_rankings &&
+  Array.isArray(inputData.scenario_rankings)
+) {
+  console.log("Processing scenario_rankings array");
+  scenarios = inputData.scenario_rankings;
+} else {
+  console.log("No recognizable scenario data found");
+  return [
+    { json: { source_extraction_prompts: [], original_data: inputData } },
+  ];
+}
 
 // Function to extract sources from a single scenario
 function extractSourcesFromScenario(scenario) {
@@ -290,10 +311,9 @@ else if (
   });
 }
 
-// Check if this is results array from Format Prompt 32
-else if (inputData.results && Array.isArray(inputData.results)) {
-  console.log("Processing results array:", inputData.results.length);
-  scenarios = inputData.results;
+// Process the scenarios we identified earlier
+if (scenarios.length > 0) {
+  console.log("Processing scenarios:", scenarios.length);
 
   // Extract sources from all scenarios
   scenarios.forEach((scenario, index) => {

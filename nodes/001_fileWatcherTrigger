@@ -1,0 +1,59 @@
+{
+  "parameters": {
+    "formTitle": "Competitive Analysis CSV Upload",
+    "formDescription": "Upload a CSV file to start the competitive analysis workflow",
+    "formFields": {
+      "values": [
+        {
+          "fieldLabel": "Company CSV File",
+          "fieldType": "file",
+          "requiredField": true,
+          "fieldOptions": {
+            "allowedFileTypes": "csv",
+            "maxFileSize": "10MB"
+          }
+        },
+        {
+          "fieldLabel": "Company Name (Optional)",
+          "fieldType": "string",
+          "requiredField": false,
+          "fieldOptions": {
+            "placeholder": "Enter company name for custom project naming"
+          }
+        },
+        {
+          "fieldLabel": "Analysis Type",
+          "fieldType": "select",
+          "requiredField": true,
+          "fieldOptions": {
+            "options": [
+              {
+                "name": "Full Competitive Analysis",
+                "value": "full"
+              },
+              {
+                "name": "Quick Competitor Research",
+                "value": "quick"
+              },
+              {
+                "name": "Market Positioning Only",
+                "value": "positioning"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "options": {
+      "formSubmittedText": "✅ CSV uploaded successfully! Your competitive analysis is now running. You'll receive a notification when complete."
+    }
+  },
+  "type": "n8n-nodes-base.formTrigger",
+  "typeVersion": 2,
+  "position": [
+    -336,
+    32
+  ],
+  "id": "form-trigger",
+  "name": "001_formTrigger"
+}

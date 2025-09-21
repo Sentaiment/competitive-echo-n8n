@@ -1,0 +1,20 @@
+{
+  "parameters": {
+    "operation": "fromFile",
+    "fileFormat": "csv",
+    "binaryPropertyName": "data",
+    "options": {
+      "delimiter": ",",
+      "headerRow": true,
+      "fromLine": 1
+    }
+  },
+  "type": "n8n-nodes-base.spreadsheetFile",
+  "typeVersion": 2,
+  "position": [
+    0,
+    32
+  ],
+  "id": "read-csv-data",
+  "name": "003_readCSVData"
+}

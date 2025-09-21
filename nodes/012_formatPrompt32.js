@@ -2,7 +2,9 @@
 // Updated to allow all domains while maintaining explicit allowlist for reference
 
 // 1) Centralized allowlist of domains (maintained for explicit tracking and reference)
+// Expanded to include domains commonly found in competitive intelligence research
 const EXPLICIT_ALLOWLIST = new Set([
+  // Original 27 domains (social media & basic web)
   "reddit.com",
   "www.reddit.com",
   "old.reddit.com",
@@ -24,12 +26,131 @@ const EXPLICIT_ALLOWLIST = new Set([
   "www.facebook.com",
   "m.facebook.com",
   "quora.com",
-  "www.quora.com", // correct spelling
-  "qoura.com", // common misspelling seen in user content
+  "www.quora.com",
+  "qoura.com", // common misspelling
   "medium.com",
   "www.medium.com",
   "instagram.com",
   "www.instagram.com",
+
+  // Business & News Sources (from workflow prompts)
+  "forbes.com",
+  "www.forbes.com",
+  "bloomberg.com",
+  "www.bloomberg.com",
+  "reuters.com",
+  "www.reuters.com",
+  "cnbc.com",
+  "www.cnbc.com",
+  "wsj.com",
+  "www.wsj.com",
+  "wsjonline.com",
+  "ft.com",
+  "www.ft.com",
+  "ft.com",
+  "businessinsider.com",
+  "www.businessinsider.com",
+  "techcrunch.com",
+  "www.techcrunch.com",
+  "venturebeat.com",
+  "www.venturebeat.com",
+  "hbr.org",
+  "www.hbr.org", // Harvard Business Review
+
+  // Social Media & Community Platforms
+  "twitter.com",
+  "www.twitter.com",
+  "x.com",
+  "www.x.com",
+  "tiktok.com",
+  "www.tiktok.com",
+  "snapchat.com",
+  "www.snapchat.com",
+  "discord.com",
+  "www.discord.com",
+  "pinterest.com",
+  "www.pinterest.com",
+  "tumblr.com",
+  "www.tumblr.com",
+
+  // Professional & Academic Sources
+  "glassdoor.com",
+  "www.glassdoor.com",
+  "indeed.com",
+  "www.indeed.com",
+  "crunchbase.com",
+  "www.crunchbase.com",
+  "pitchbook.com",
+  "www.pitchbook.com",
+  "mckinsey.com",
+  "www.mckinsey.com",
+  "bain.com",
+  "www.bain.com",
+  "bcg.com",
+  "www.bcg.com",
+  "deloitte.com",
+  "www.deloitte.com",
+  "pwc.com",
+  "www.pwc.com",
+  "kpmg.com",
+  "www.kpmg.com",
+  "accenture.com",
+  "www.accenture.com",
+
+  // Financial & Market Data
+  "sec.gov",
+  "www.sec.gov",
+  "nasdaq.com",
+  "www.nasdaq.com",
+  "nyse.com",
+  "www.nyse.com",
+  "yahoo.com",
+  "www.yahoo.com",
+  "finance.yahoo.com",
+  "marketwatch.com",
+  "www.marketwatch.com",
+  "investing.com",
+  "www.investing.com",
+  "morningstar.com",
+  "www.morningstar.com",
+  "zacks.com",
+  "www.zacks.com",
+
+  // Research & Analytics
+  "statista.com",
+  "www.statista.com",
+  "ibisworld.com",
+  "www.ibisworld.com",
+  "mintel.com",
+  "www.mintel.com",
+  "nielsen.com",
+  "www.nielsen.com",
+  "comscore.com",
+  "www.comscore.com",
+  "similarweb.com",
+  "www.similarweb.com",
+  "alexa.com",
+  "www.alexa.com",
+
+  // Press Release & News Distribution
+  "prnewswire.com",
+  "www.prnewswire.com",
+  "businesswire.com",
+  "www.businesswire.com",
+  "globenewswire.com",
+  "www.globenewswire.com",
+  "marketwired.com",
+  "www.marketwired.com",
+
+  // NPS & Customer Satisfaction Scoring Sources
+  "acsi.org",
+  "www.acsi.org", // American Customer Satisfaction Index
+  "npsbenchmarks.com",
+  "www.npsbenchmarks.com", // NPS benchmarking data
+  "temkin-group.com",
+  "www.temkin-group.com", // Customer experience research
+  "forrester.com",
+  "www.forrester.com", // Customer experience research
 ]);
 
 // 2) Helpers
@@ -83,20 +204,10 @@ function normalizeCitation(cit) {
 
   // Normalize URL + domain + verification
   if (out.source_url && typeof out.source_url === "string") {
-    const allowed = isAllowedURL(out.source_url);
-    if (!allowed) {
-      // This should now never happen since we allow all domains, but keeping for safety
-      out.allowlist_violation = true;
-      out.source_domain = null;
-      out.source_url = null;
-      if (!out.verification_status || out.verification_status === "verified") {
-        out.verification_status = "unverified";
-      }
-    } else {
-      // Allowed: derive domain if missing
-      if (!out.source_domain) out.source_domain = extractDomain(out.source_url);
-      out.allowlist_violation = false;
-    }
+    // All domains are now allowed - no blocking logic needed
+    // Derive domain if missing
+    if (!out.source_domain) out.source_domain = extractDomain(out.source_url);
+    out.allowlist_violation = false;
   } else {
     // No URL provided
     out.source_domain = out.source_domain || null;
@@ -180,13 +291,10 @@ for (let i = 0; i < $input.all().length; i++) {
         const norm = normalizeCitation(c);
         const after = norm?.source_url ? [norm.source_url] : [];
 
-        // Diagnostics - now all URLs should be allowed
+        // Diagnostics - all URLs are now allowed
         for (const u of before) {
           if (isAllowedURL(u)) {
             allowed_urls.push(u);
-          } else {
-            blocked_urls.push(u);
-            console.warn(`⚠️ Unexpected blocked URL: ${u}`);
           }
         }
         for (const u of after) {
@@ -209,10 +317,6 @@ for (let i = 0; i < $input.all().length; i++) {
       const urls = collectUrlsFromText(responseText);
       for (const u of urls) {
         if (isAllowedURL(u)) allowed_urls.push(u);
-        else {
-          blocked_urls.push(u);
-          console.warn(`⚠️ Unexpected blocked URL in text: ${u}`);
-        }
       }
     }
 

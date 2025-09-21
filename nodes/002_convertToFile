@@ -1,0 +1,16 @@
+{
+  "parameters": {
+    "inputBinaryField": "Company CSV File",
+    "outputBinaryProperty": "data",
+    "fileName": "={{ $binary['Company CSV File'].fileName || 'data.csv' }}",
+    "mimeType": "text/csv"
+  },
+  "type": "n8n-nodes-base.convertToFile",
+  "typeVersion": 1,
+  "position": [
+    -224,
+    32
+  ],
+  "id": "convert-to-file",
+  "name": "002_convertToFile"
+}

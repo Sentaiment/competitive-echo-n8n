@@ -8,13 +8,25 @@ const rawFilename =
 const filePath = "index.html";
 // const filePath = `reports/competitive-intelligence/${rawFilename}`;
 
+// Get company name from form input or existing data
+const companyName = $json["Company Name (Optional)"] || $json.company;
+
 return [
   {
     json: {
       content: html,
       filePath,
-      // if project already exists use its name; if not, this will create it
-      projectName: "sentaiment-reports",
+      // Dynamic project name based on company and timestamp
+      projectName:
+        (companyName
+          ? companyName
+              .toLowerCase()
+              .replace(/[^a-z0-9]/g, "-")
+              .replace(/-+/g, "-")
+              .replace(/^-|-$/g, "")
+          : "competitive-analysis") +
+        "-" +
+        new Date().toISOString().split("T")[0].replace(/-/g, ""),
     },
   },
 ];

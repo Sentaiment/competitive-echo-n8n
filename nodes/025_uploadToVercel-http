@@ -3,7 +3,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.vercel.com/v13/deployments?skipAutoDetectionConfirmation=1",
+        "url": "=https://api.vercel.com/v1/deployments",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpBearerAuth",
         "sendHeaders": true,
@@ -17,8 +17,21 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ {\n  // EITHER send \"name\"...\n  name: $json.projectName,\n  // ...OR if you want to target an existing project explicitly, use \"project\"\n  // project: $json.projectName,\n\n  files: [\n    { file: $json.filePath, data: $json.content }\n  ]\n} }}",
-        "options": {}
+        "jsonBody": "={{ {\n  \"name\": $json.projectName,\n  \"files\": [\n    {\n      \"file\": $json.filePath,\n      \"data\": $json.content\n    }\n  ],\n  \"project\": $json.projectName,\n  \"target\": \"production\"\n} }}",
+        "options": {
+          "retry": {
+            "enabled": true,
+            "maxRetries": 3,
+            "retryDelay": 3000
+          },
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,

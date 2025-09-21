@@ -17,7 +17,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({\n  model: \"claude-3-5-sonnet-20240620\",\n  max_tokens: 2000,\n  temperature: 0.1,\n  system: $json.research_prompt.system_content,\n  messages: [\n    { role: \"user\", content: $json.research_prompt.user_content }\n  ]\n}) }}",
+        "jsonBody": "={{ JSON.stringify({\n  \"model\": \"claude-3-5-sonnet-20240620\",\n  \"max_tokens\": 2000,\n  \"temperature\": 0.1,\n  \"system\": $json.research_prompt?.system_content || \"You are a competitive intelligence researcher.\",\n  \"messages\": [\n    { \"role\": \"user\", \"content\": $json.research_prompt?.user_content || \"Research additional competitors.\" }\n  ]\n}) }}",
         "options": {
           "retry": {
             "enabled": true,
