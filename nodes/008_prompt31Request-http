@@ -1,0 +1,51 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": " 2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n    model: \"claude-3-5-sonnet-20240620\",\n    max_tokens: 6000,\n    temperature: 0.2,\n    // Put your full system prompt here:\n    system: $json.system_content,\n    messages: [\n      { role: \"user\", content: $json.user_content }\n    ]\n  }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1232,
+        32
+      ],
+      "id": "d35eea3b-6c82-46c0-a95c-c5d85bd039ab",
+      "name": "008_prompt31Request-http",
+      "credentials": {
+        "anthropicApi": {
+          "id": "1jk5Er35vKWwOaad",
+          "name": "Anthropic account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "008_prompt31Request-http": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e627ba3cf413f5c8fbbcb0c34adbe72399de282a282eb839e23356d673f567eb"
+  }
+}

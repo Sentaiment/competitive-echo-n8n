@@ -32,18 +32,14 @@ function extractSourcesFromScenario(scenario) {
       `  - Found ${scenario.sources.length} sources in sources array`
     );
     scenario.sources.forEach((source) => {
-      // Try to generate a specific URL for this source
-      const specificUrl = generateSpecificUrl(source, "scenario_source");
-      const sourceUrl = specificUrl || source;
-
       sources.push({
         source_name: source,
-        source_url: sourceUrl,
-        source_domain: extractDomain(sourceUrl),
+        source_url: extractUrlFromSource(source),
+        source_domain: extractDomain(source),
         scenario_id: scenario.scenario_id,
         scenario_title: scenario.scenario_title || scenario.title,
         context: scenario.key_findings || [],
-        source_type: determineSourceType(sourceUrl),
+        source_type: determineSourceType(source),
       });
     });
   }
@@ -64,18 +60,14 @@ function extractSourcesFromScenario(scenario) {
           `    - Company ${index + 1} has ${detail.sources.length} sources`
         );
         detail.sources.forEach((source) => {
-          // Try to generate a specific URL for this source
-          const specificUrl = generateSpecificUrl(source, "analysis_detail");
-          const sourceUrl = specificUrl || source;
-
           sources.push({
             source_name: source,
-            source_url: sourceUrl,
-            source_domain: extractDomain(sourceUrl),
+            source_url: extractUrlFromSource(source),
+            source_domain: extractDomain(source),
             scenario_id: scenario.scenario_id,
             scenario_title: scenario.scenario_title || scenario.title,
             context: detail.highlights || detail.summary || [],
-            source_type: determineSourceType(sourceUrl),
+            source_type: determineSourceType(source),
           });
         });
       }
@@ -92,18 +84,14 @@ function extractSourcesFromScenario(scenario) {
         const parsedData = JSON.parse(jsonMatch[1]);
         if (parsedData.sources && Array.isArray(parsedData.sources)) {
           parsedData.sources.forEach((source) => {
-            // Try to generate a specific URL for this source
-            const specificUrl = generateSpecificUrl(source, "response_text");
-            const sourceUrl = specificUrl || source;
-
             sources.push({
               source_name: source,
-              source_url: sourceUrl,
-              source_domain: extractDomain(sourceUrl),
+              source_url: extractUrlFromSource(source),
+              source_domain: extractDomain(source),
               scenario_id: scenario.scenario_id,
               scenario_title: scenario.scenario_title || scenario.title,
               context: parsedData.key_findings || [],
-              source_type: determineSourceType(sourceUrl),
+              source_type: determineSourceType(source),
             });
           });
         }
@@ -116,101 +104,116 @@ function extractSourcesFromScenario(scenario) {
   return sources;
 }
 
-// Helper function to extract domain from URL
-function extractDomain(url) {
-  try {
-    if (url.startsWith("http")) {
-      return new URL(url).hostname;
-    }
-    return url;
-  } catch (error) {
-    return url;
+// Helper function to extract URL from source string if it contains one
+function extractUrlFromSource(source) {
+  // Check if source already contains a URL
+  const urlMatch = source.match(/(https?:\/\/[^\s,]+)/);
+  if (urlMatch) {
+    return urlMatch[1].replace(/[,\")]*$/, ""); // Clean trailing punctuation
   }
-}
-
-// Helper function to generate specific URLs for common sources
-function generateSpecificUrl(sourceName, sourceType) {
-  const source = sourceName.toLowerCase();
-
-  // Forbes Travel Guide specific URLs
-  if (
-    source.includes("forbes travel guide") ||
-    source.includes("forbestravelguide")
-  ) {
-    return "https://www.forbestravelguide.com/awards";
-  }
-
-  // J.D. Power specific URLs
-  if (source.includes("j.d. power") || source.includes("jdpower")) {
-    return "https://www.jdpower.com/business/press-releases/2023-north-america-hotel-guest-satisfaction-study";
-  }
-
-  // Travel + Leisure specific URLs
-  if (
-    source.includes("travel + leisure") ||
-    source.includes("travelandleisure")
-  ) {
-    return "https://www.travelandleisure.com/hotels-resorts/las-vegas-luxury-hotels";
-  }
-
-  // TripAdvisor specific URLs
-  if (source.includes("tripadvisor")) {
-    return "https://www.tripadvisor.com/Hotels-g45963-Las_Vegas_Nevada-Hotels.html";
-  }
-
-  // Las Vegas Review-Journal specific URLs
-  if (
-    source.includes("las vegas review-journal") ||
-    source.includes("reviewjournal")
-  ) {
-    return "https://www.reviewjournal.com/business/tourism/";
-  }
-
-  // James Beard Foundation specific URLs
-  if (source.includes("james beard")) {
-    return "https://www.jamesbeard.org/awards";
-  }
-
-  // AAA specific URLs
-  if (source.includes("aaa") && source.includes("diamond")) {
-    return "https://www.aaa.com/travel/hotels/diamond-ratings/";
-  }
-
-  // MGM Resorts specific URLs
-  if (source.includes("mgm") && source.includes("esg")) {
-    return "https://www.mgmresorts.com/en/company/esg.html";
-  }
-
-  // Wynn Resorts specific URLs
-  if (
-    source.includes("wynn") &&
-    (source.includes("annual") || source.includes("report"))
-  ) {
-    return "https://investor.wynnresorts.com/annual-reports";
-  }
-
-  // Return null if no specific URL can be generated
   return null;
 }
 
-// Helper function to determine source type
+// Helper function to extract domain from URL or source
+function extractDomain(source) {
+  try {
+    // First check if there's a URL in the source
+    const url = extractUrlFromSource(source);
+    if (url) {
+      return new URL(url).hostname;
+    }
+
+    // If no URL, try to extract domain patterns from text
+    const domainMatch = source.match(/([a-zA-Z0-9-]+\.[a-zA-Z]{2,})/);
+    if (domainMatch) {
+      return domainMatch[1];
+    }
+
+    return source;
+  } catch (error) {
+    return source;
+  }
+}
+
+// Helper function to determine source type based on content analysis
 function determineSourceType(source) {
-  if (source.includes("forbestravelguide.com")) return "industry_guide";
-  if (source.includes("tripadvisor.com")) return "review_platform";
-  if (source.includes("reddit.com")) return "social_media";
-  if (source.includes("youtube.com")) return "video_content";
-  if (source.includes("twitter.com") || source.includes("x.com"))
+  const sourceLower = source.toLowerCase();
+
+  // Industry guides and rating organizations
+  if (sourceLower.includes("forbes") || sourceLower.includes("travel guide"))
+    return "industry_guide";
+  if (sourceLower.includes("j.d. power") || sourceLower.includes("jdpower"))
+    return "industry_guide";
+  if (sourceLower.includes("aaa") && sourceLower.includes("diamond"))
+    return "industry_guide";
+
+  // Review and consumer platforms
+  if (sourceLower.includes("tripadvisor")) return "review_platform";
+  if (sourceLower.includes("yelp")) return "review_platform";
+  if (sourceLower.includes("google reviews")) return "review_platform";
+
+  // Social media platforms
+  if (sourceLower.includes("reddit")) return "social_media";
+  if (sourceLower.includes("twitter") || sourceLower.includes("x.com"))
     return "social_media";
-  if (source.includes("instagram.com")) return "social_media";
-  if (source.includes("reviewjournal.com")) return "news_article";
+  if (sourceLower.includes("instagram")) return "social_media";
+  if (sourceLower.includes("facebook")) return "social_media";
+  if (sourceLower.includes("tiktok")) return "social_media";
+
+  // Video content
+  if (sourceLower.includes("youtube")) return "video_content";
+  if (sourceLower.includes("vimeo")) return "video_content";
+
+  // News and media
   if (
-    source.includes("wynn") ||
-    source.includes("venetian") ||
-    source.includes("mgm") ||
-    source.includes("fontainebleau")
+    sourceLower.includes("review-journal") ||
+    sourceLower.includes("reviewjournal")
+  )
+    return "news_article";
+  if (
+    sourceLower.includes("cnn") ||
+    sourceLower.includes("bbc") ||
+    sourceLower.includes("reuters")
+  )
+    return "news_article";
+  if (
+    sourceLower.includes("travel + leisure") ||
+    sourceLower.includes("conde nast")
+  )
+    return "travel_media";
+
+  // Company sources
+  if (sourceLower.includes("annual report") || sourceLower.includes("investor"))
+    return "company_report";
+  if (sourceLower.includes("press release")) return "company_report";
+  if (
+    sourceLower.includes("wynn") ||
+    sourceLower.includes("mgm") ||
+    sourceLower.includes("venetian") ||
+    sourceLower.includes("fontainebleau")
   )
     return "company_website";
-  if (source.includes(".com") || source.includes(".org")) return "web_research";
+
+  // Academic and research
+  if (sourceLower.includes("study") || sourceLower.includes("research"))
+    return "research_report";
+  if (sourceLower.includes("university") || sourceLower.includes("institute"))
+    return "academic_source";
+
+  // Government and regulatory
+  if (sourceLower.includes(".gov") || sourceLower.includes("government"))
+    return "government_source";
+  if (sourceLower.includes("lvcva") || sourceLower.includes("convention"))
+    return "government_source";
+
+  // Default web research for anything with domain patterns
+  if (
+    sourceLower.includes(".com") ||
+    sourceLower.includes(".org") ||
+    sourceLower.includes(".net")
+  )
+    return "web_research";
+
   return "unknown";
 }
 
@@ -425,8 +428,10 @@ Used in Scenarios: ${scenariosUsed.join(", ")}
 Context: ${context.slice(0, 2).join("; ")}
 
 REQUIREMENTS:
+IMPORTANT: If sources contain existing publication years (like '2023'), preserve those original dates exactly. Do not use current system date unless source completely lacks any date information.
+
 1. Find the specific URL for this source (if available)
-2. Extract exact publication date (YYYY-MM-DD format)
+2. Extract exact publication date (YYYY-MM-DD format) - preserve original years from source names
 3. Identify author(s) or organization
 4. Determine authority score (1-10) based on:
    - Source credibility and reputation
@@ -458,7 +463,7 @@ RETURN JSON FORMAT:
       "source_type": "web_research|training_data|company_report|news_article",
       "source_url": "https://actual-source-url.com",
       "source_domain": "domain.com",
-      "publication_date": "2025-01-15",
+      "publication_date": "PRESERVE_ORIGINAL_YEAR_FROM_SOURCE_NAME",
       "author": "Actual Author Name or Organization",
       "author_credibility_score": 8,
       "source_origin": "web_research|training_data|company_filing",
@@ -487,7 +492,7 @@ RETURN JSON FORMAT:
     "source_diversity_score": 7,
     "recency_score": 6,
     "deduplication_applied": true,
-    "extraction_timestamp": "${new Date().toISOString()}"
+    "data_processing_timestamp": "SYSTEM_GENERATED_DURING_EXTRACTION"
   }
 }
 
@@ -507,7 +512,9 @@ return [
         total_sources: uniqueSources.length,
         total_scenarios: scenarios.length,
         total_source_references: sourceReferences.length,
-        extraction_timestamp: new Date().toISOString(),
+        data_extraction_run_timestamp: new Date().toISOString(),
+        data_extraction_note:
+          "Timestamp indicates when source extraction process was performed, not source publication dates",
         prd_version: "2.0",
         source_types: uniqueSources.reduce((acc, source) => {
           acc[source.source_type] = (acc[source.source_type] || 0) + 1;

@@ -51,43 +51,28 @@ RESEARCH TASKS:
    - Industry recognition and peer validation
    - Historical accuracy and reliability
    - Editorial standards and fact-checking
-   - Social media engagement metrics (likes, shares, comments)
-   - Community credibility and user verification
 5. Assess verification status through cross-referencing
 6. Determine source origin:
    - training_data: Information from model training (pre-2025)
    - real_time_search: Recent web search results (post-2025)
-   - social_media: Reddit, YouTube, Twitter, TikTok, Instagram posts
    - hybrid: Mix of training and real-time data
 7. Calculate influence weight (0.0-1.0) based on:
    - Authority score
    - Recency of information
    - Cross-reference count
    - Source reach and distribution
-   - Social media engagement (upvotes, views, shares)
-   - Community consensus and discussion quality
 8. Identify bias indicators (low/medium/high) based on:
    - Editorial stance
    - Funding sources
    - Political affiliations
    - Commercial interests
-   - Social media echo chambers
-   - User sentiment patterns
 9. Extract cross-references and supporting evidence
-10. Determine content type:
-    - competitive_research/earnings_call/press_release/analyst_report
-    - reddit_discussion/youtube_review/twitter_thread/instagram_post
-    - user_generated_content/influencer_content/community_feedback
+10. Determine content type (competitive_research/earnings_call/press_release/analyst_report)
 11. Assess sentiment direction (positive/negative/neutral)
 12. Identify brand mention type (direct_comparison/market_positioning/strategic_move)
 13. Calculate actionability score (1-10) for strategic relevance
 14. Determine geographic scope (global/regional/local)
 15. Assess time sensitivity (immediate/quarterly/annual)
-16. For social media sources, extract:
-    - Engagement metrics (likes, shares, comments, views)
-    - Community sentiment and discussion quality
-    - User credibility and verification status
-    - Post recency and viral potential
 
 RETURN JSON FORMAT:
 {
@@ -96,22 +81,22 @@ RETURN JSON FORMAT:
       "claim_text": "Specific claim from this source",
       "claim_category": "competitive_analysis",
       "claim_impact_score": 7,
-      "source_type": "web_research|training_data|company_report|news_article|reddit_discussion|youtube_review|twitter_thread|instagram_post|tiktok_video",
+      "source_type": "web_research|training_data|company_report|news_article",
       "source_url": "https://actual-source-url.com",
       "source_domain": "domain.com",
       "publication_date": "2025-01-15",
       "author": "Actual Author Name or Organization",
       "author_credibility_score": 8,
-      "source_origin": "web_research|training_data|company_filing|social_media",
+      "source_origin": "web_research|training_data|company_filing",
       "training_data_cutoff": "2025-01",
       "authority_score": 8,
       "verification_status": "verified|unverified|conflicting",
-      "content_type": "competitive_research|earnings_call|press_release|analyst_report|reddit_discussion|youtube_review|twitter_thread|instagram_post|tiktok_video",
+      "content_type": "competitive_research|earnings_call|press_release|analyst_report",
       "bias_indicators": "low|medium|high",
       "cross_references": 2,
       "confidence_level": "high|medium|low",
       "supporting_evidence": "Specific data points or context",
-      "real_time_indicators": ["recent_announcement", "market_movement", "social_engagement", "viral_content"],
+      "real_time_indicators": ["recent_announcement", "market_movement"],
       "brand_mention_type": "direct_comparison|market_positioning|strategic_move",
       "sentiment_direction": "positive|negative|neutral",
       "influence_weight": 0.8,
@@ -119,13 +104,7 @@ RETURN JSON FORMAT:
       "actionability_score": 8,
       "geographic_scope": "global|regional|local",
       "time_sensitivity": "immediate|quarterly|annual",
-      "tags": ["competitive_analysis", "luxury_hospitality", "service_quality"],
-      "social_media_metrics": {
-        "engagement_score": 8,
-        "community_consensus": "high|medium|low",
-        "viral_potential": "high|medium|low",
-        "user_credibility": "verified|unverified|influencer"
-      }
+      "tags": ["competitive_analysis", "luxury_hospitality", "service_quality"]
     }
   ],
   "extraction_metadata": {
@@ -134,9 +113,7 @@ RETURN JSON FORMAT:
     "source_diversity_score": 7,
     "recency_score": 6,
     "deduplication_applied": true,
-    "extraction_timestamp": "${new Date().toISOString()}",
-    "social_media_sources": 1,
-    "traditional_sources": 0
+    "extraction_timestamp": "${new Date().toISOString()}"
   }
 }
 

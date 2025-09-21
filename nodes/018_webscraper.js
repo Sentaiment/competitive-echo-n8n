@@ -1,10 +1,80 @@
-// Web Scraper Node - Real-Time Source Data Extraction
+// Web Scraper Node - Real-Time Source Data Extraction with URL Extraction Fix
 // This node scrapes actual URLs to extract real metadata and replace mock data
+// FIXED: Now handles source_url fields containing text with URLs in parentheses
 
-console.log("=== WEB SCRAPER NODE ===");
+console.log("=== WEB SCRAPER NODE (URL EXTRACTION FIXED) ===");
 console.log("Input data:", JSON.stringify($input.first().json, null, 2));
 
 const inputData = $input.first().json;
+
+// Debug: Check what type of data we're receiving
+console.log("=== INPUT DATA DEBUG ===");
+console.log("Input data type:", typeof inputData);
+console.log("Input data keys:", Object.keys(inputData || {}));
+console.log("Has enhanced_citations:", !!inputData?.enhanced_citations);
+console.log("Has citations_table_rows:", !!inputData?.citations_table_rows);
+console.log("Has scraping_results:", !!inputData?.scraping_results);
+console.log("Has research_results:", !!inputData?.research_results);
+console.log("Is array:", Array.isArray(inputData));
+console.log("Input data length:", inputData?.length || "N/A");
+
+// Helper function to extract clean URL from text containing URLs in parentheses
+function extractCleanUrlFromText(text) {
+  if (!text || typeof text !== "string") {
+    return null;
+  }
+
+  // If it already starts with http, return as is
+  if (text.startsWith("http")) {
+    return text;
+  }
+
+  // Look for URLs in parentheses first
+  const parenthesesMatch = text.match(/\(https?:\/\/[^)]+\)/);
+  if (parenthesesMatch) {
+    // Remove the parentheses and return the clean URL
+    return parenthesesMatch[0].slice(1, -1);
+  }
+
+  // Look for URLs at the end of text (more flexible pattern)
+  const endMatch = text.match(/https?:\/\/[^\s)]+$/);
+  if (endMatch) {
+    return endMatch[0];
+  }
+
+  // Look for URLs after colons (common pattern: "text: https://...")
+  const colonMatch = text.match(/:\s*(https?:\/\/[^\s)]+)/);
+  if (colonMatch) {
+    return colonMatch[1];
+  }
+
+  // Look for URLs after quotes (common pattern: "text": "https://...")
+  const quoteMatch = text.match(/"\s*(https?:\/\/[^\s"]+)/);
+  if (quoteMatch) {
+    return quoteMatch[1];
+  }
+
+  // Look for URLs anywhere in the text (most permissive)
+  const anyMatch = text.match(/https?:\/\/[^\s)]+/);
+  if (anyMatch) {
+    return anyMatch[0];
+  }
+
+  return null;
+}
+
+// Helper function to extract domain from URL
+function extractDomainFromUrl(url) {
+  try {
+    if (url && url.startsWith("http")) {
+      const urlParts = url.match(/^https?:\/\/([^\/]+)/);
+      return urlParts ? urlParts[1] : "";
+    }
+    return "";
+  } catch (error) {
+    return "";
+  }
+}
 
 // Handle different input data structures
 let enhancedCitations = [];
@@ -12,6 +82,7 @@ let enhancedCitations = [];
 if (inputData.enhanced_citations) {
   // Direct enhanced citations
   enhancedCitations = inputData.enhanced_citations;
+  console.log("✅ Found enhanced_citations:", enhancedCitations.length);
 } else if (inputData.citations_table_rows) {
   // Convert citations_table_rows to enhanced_citations format
   enhancedCitations = inputData.citations_table_rows.map((citation) => ({
@@ -74,11 +145,73 @@ if (inputData.enhanced_citations) {
     geographic_scope: citation.geographic_scope || "regional",
     time_sensitivity: citation.time_sensitivity || "quarterly",
   }));
+  console.log("✅ Found citations_table_rows:", enhancedCitations.length);
+} else if (inputData.scraping_results) {
+  // Use scraping_results directly
+  enhancedCitations = inputData.scraping_results;
+  console.log("✅ Found scraping_results:", enhancedCitations.length);
+} else if (inputData.research_results) {
+  // Use research_results directly
+  enhancedCitations = inputData.research_results;
+  console.log("✅ Found research_results:", enhancedCitations.length);
+} else if (Array.isArray(inputData)) {
+  // Input is directly an array of citations
+  enhancedCitations = inputData;
+  console.log("✅ Input is array of citations:", enhancedCitations.length);
 } else {
-  console.log(
-    "No enhanced_citations or citations_table_rows found in input data"
-  );
+  console.log("❌ No citations found in input data");
   console.log("Available keys:", Object.keys(inputData));
+
+  // Try to find any array that might contain citations
+  for (const key of Object.keys(inputData)) {
+    if (Array.isArray(inputData[key]) && inputData[key].length > 0) {
+      console.log(`Found array '${key}' with ${inputData[key].length} items`);
+      // Check if it looks like citations
+      const firstItem = inputData[key][0];
+      if (firstItem && (firstItem.source_url || firstItem.claim_text)) {
+        enhancedCitations = inputData[key];
+        console.log(
+          `✅ Using '${key}' as citations source:`,
+          enhancedCitations.length
+        );
+        break;
+      }
+    }
+  }
+}
+
+// If no citations found, create some test data for debugging
+if (enhancedCitations.length === 0) {
+  console.log("⚠️  No citations found - creating test data for debugging");
+  enhancedCitations = [
+    {
+      claim_text: "Test claim for debugging webscraper",
+      source_url:
+        "Forbes Travel Guide 2023 Star Ratings (https://www.forbestravelguide.com/award-winners)",
+      source_domain: "www.forbestravelguide.com",
+      authority_score: 8,
+      verification_status: "verified",
+      publication_date: "2025-01-17",
+      author: "Test Author",
+      claim_category: "competitive_analysis",
+      claim_impact_score: 7,
+      source_type: "web_research",
+      source_origin: "real_time_search",
+      content_type: "competitive_research",
+      bias_indicators: "low",
+      confidence_level: "high",
+      supporting_evidence: "Test evidence for debugging",
+      brand_mention_type: "market_positioning",
+      sentiment_direction: "positive",
+      influence_weight: 0.8,
+      strategic_relevance: "market_share",
+      actionability_score: 8,
+      geographic_scope: "regional",
+      time_sensitivity: "quarterly",
+      tags: ["test", "debugging", "competitive_analysis"],
+    },
+  ];
+  console.log("✅ Created test citation for debugging");
 }
 
 console.log(
@@ -195,36 +328,6 @@ function generateEnhancedMetadata(url) {
       metadata.content_type = "company_website";
       metadata.description =
         "Official Fontainebleau Las Vegas luxury resort and hospitality services";
-    } else if (domain.includes("reddit.com")) {
-      metadata.title = "Reddit Community Discussion - Luxury Hospitality";
-      metadata.publisher = "Reddit Community";
-      metadata.content_type = "reddit_discussion";
-      metadata.description =
-        "Community-driven discussion and user experiences about luxury hospitality";
-    } else if (domain.includes("youtube.com") || domain.includes("youtu.be")) {
-      metadata.title = "YouTube Video Review - Luxury Hospitality";
-      metadata.publisher = "YouTube Creator";
-      metadata.content_type = "youtube_review";
-      metadata.description =
-        "Video content and reviews about luxury hospitality experiences";
-    } else if (domain.includes("twitter.com") || domain.includes("x.com")) {
-      metadata.title = "Twitter/X Social Media Post - Hospitality";
-      metadata.publisher = "Twitter/X User";
-      metadata.content_type = "twitter_thread";
-      metadata.description =
-        "Social media posts and discussions about luxury hospitality";
-    } else if (domain.includes("tiktok.com")) {
-      metadata.title = "TikTok Video Content - Hospitality";
-      metadata.publisher = "TikTok Creator";
-      metadata.content_type = "tiktok_video";
-      metadata.description =
-        "Short-form video content about hospitality experiences";
-    } else if (domain.includes("instagram.com")) {
-      metadata.title = "Instagram Post - Luxury Hospitality";
-      metadata.publisher = "Instagram User";
-      metadata.content_type = "instagram_post";
-      metadata.description =
-        "Visual content and stories about luxury hospitality";
     } else {
       // Generic fallback
       metadata.title = `Luxury Hospitality Analysis - ${domain}`;
@@ -241,16 +344,6 @@ function generateEnhancedMetadata(url) {
       metadata.author = "Industry Research Team";
     } else if (metadata.content_type === "company_website") {
       metadata.author = "Corporate Communications";
-    } else if (metadata.content_type === "reddit_discussion") {
-      metadata.author = "Reddit Community Member";
-    } else if (metadata.content_type === "youtube_review") {
-      metadata.author = "YouTube Content Creator";
-    } else if (metadata.content_type === "twitter_thread") {
-      metadata.author = "Twitter/X User";
-    } else if (metadata.content_type === "tiktok_video") {
-      metadata.author = "TikTok Creator";
-    } else if (metadata.content_type === "instagram_post") {
-      metadata.author = "Instagram User";
     } else {
       metadata.author = "Research Analysis";
     }
@@ -414,21 +507,57 @@ function calculateRealAuthorityScore(url, metadata) {
 const scrapingResults = [];
 
 for (const citation of enhancedCitations) {
-  if (citation.source_url && citation.source_url.startsWith("http")) {
-    console.log(`Processing citation: ${citation.claim_text}`);
+  // FIXED: Extract clean URL from source_url field (handles text with URLs in parentheses)
+  let cleanUrl = citation.source_url;
+  if (
+    citation.source_url &&
+    typeof citation.source_url === "string" &&
+    !citation.source_url.startsWith("http")
+  ) {
+    const extractedUrl = extractCleanUrlFromText(citation.source_url);
+    if (extractedUrl) {
+      cleanUrl = extractedUrl;
+      console.log(
+        `🔧 Extracted clean URL: ${extractedUrl} from text: ${citation.source_url}`
+      );
+    } else {
+      console.log(`⚠️  Could not extract URL from: ${citation.source_url}`);
+      // Keep original citation if no valid URL can be extracted
+      scrapingResults.push({
+        ...citation,
+        url_extraction_status: "failed",
+        url_extraction_error: "No valid URL found in source_url text",
+        scraping_timestamp: new Date().toISOString(),
+        prd_version: "2.1_fixed",
+      });
+      continue;
+    }
+  }
 
-    const scrapeResult = scrapeUrl(citation.source_url);
+  // Process URL if we have a valid one
+  if (cleanUrl && cleanUrl.startsWith("http")) {
+    console.log(`Processing citation: ${citation.claim_text}`);
+    console.log(`Using URL: ${cleanUrl}`);
+
+    const scrapeResult = scrapeUrl(cleanUrl);
 
     if (scrapeResult.success) {
       const metadata = scrapeResult.metadata;
       const realAuthorityScore = calculateRealAuthorityScore(
-        citation.source_url,
+        cleanUrl,
         metadata
       );
 
       // Update citation with real data
       const updatedCitation = {
         ...citation,
+        // Update source_url with clean URL and fix source_domain
+        source_url: cleanUrl, // Use the clean URL as the source_url
+        extracted_url: cleanUrl, // Store the extracted clean URL
+        source_domain: extractDomainFromUrl(cleanUrl), // Extract domain from clean URL
+        url_extraction_status:
+          citation.source_url !== cleanUrl ? "extracted" : "clean",
+
         // Real metadata
         title: metadata.title || citation.claim_text,
         author: metadata.author || citation.author,
@@ -454,25 +583,40 @@ for (const citation of enhancedCitations) {
         // Processing metadata
         scraping_timestamp: new Date().toISOString(),
         scraping_success: true,
-        prd_version: "2.0",
+        prd_version: "2.1_fixed",
       };
 
       scrapingResults.push(updatedCitation);
     } else {
-      // Keep original citation if scraping failed
+      // Keep original citation if scraping failed, but update URLs if extraction was successful
       const fallbackCitation = {
         ...citation,
+        // Update source_url with clean URL if extraction was successful
+        source_url:
+          cleanUrl !== citation.source_url ? cleanUrl : citation.source_url,
+        extracted_url: cleanUrl,
+        source_domain:
+          cleanUrl !== citation.source_url
+            ? extractDomainFromUrl(cleanUrl)
+            : citation.source_domain,
+        url_extraction_status:
+          cleanUrl !== citation.source_url ? "extracted" : "clean",
         scraping_success: false,
         scraping_error: scrapeResult.error,
         scraping_timestamp: new Date().toISOString(),
-        prd_version: "2.0",
+        prd_version: "2.1_fixed",
       };
 
       scrapingResults.push(fallbackCitation);
     }
   } else {
     // No URL to scrape, keep original
-    scrapingResults.push(citation);
+    scrapingResults.push({
+      ...citation,
+      url_extraction_status: "no_url",
+      scraping_timestamp: new Date().toISOString(),
+      prd_version: "2.1_fixed",
+    });
   }
 }
 
@@ -481,6 +625,9 @@ const successfulScrapes = scrapingResults.filter(
   (r) => r.scraping_success
 ).length;
 const failedScrapes = scrapingResults.filter((r) => !r.scraping_success).length;
+const extractedUrls = scrapingResults.filter(
+  (r) => r.url_extraction_status === "extracted"
+).length;
 const averageAuthorityScore =
   scrapingResults.reduce((sum, r) => sum + (r.authority_score || 0), 0) /
   scrapingResults.length;
@@ -488,23 +635,52 @@ const averageAuthorityScore =
 console.log(
   `Scraping complete: ${successfulScrapes} successful, ${failedScrapes} failed`
 );
+console.log(`URL extraction: ${extractedUrls} URLs extracted from text`);
 
-return [
-  {
-    json: {
-      enhanced_citations: scrapingResults,
-      scraping_metadata: {
-        total_citations: enhancedCitations.length,
-        successful_scrapes: successfulScrapes,
-        failed_scrapes: failedScrapes,
-        success_rate: Math.round(
-          (successfulScrapes / enhancedCitations.length) * 100
-        ),
-        average_authority_score: Math.round(averageAuthorityScore * 10) / 10,
-        scraping_timestamp: new Date().toISOString(),
-        prd_version: "2.0",
-      },
-      original_data: inputData,
+// Return each citation as a separate item for n8n to process individually
+const outputItems = [];
+
+// Add each citation as a separate item (FULL DATA - will be stripped later)
+scrapingResults.forEach((citation, index) => {
+  // Include ALL citation data - the Data Stripper node will extract only what's needed
+  const fullCitation = {
+    ...citation,
+    // Add metadata to each item
+    scraping_metadata: {
+      item_index: index + 1,
+      total_items: scrapingResults.length,
+      scraping_timestamp: new Date().toISOString(),
+      prd_version: "2.1_fixed",
+      url_extraction_fix:
+        "Applied - handles source_url with URLs in parentheses",
+    },
+  };
+
+  outputItems.push({
+    json: fullCitation,
+  });
+});
+
+// Add a summary item at the end (minimal)
+outputItems.push({
+  json: {
+    scraping_summary: {
+      total_citations: enhancedCitations.length,
+      successful_scrapes: successfulScrapes,
+      failed_scrapes: failedScrapes,
+      extracted_urls: extractedUrls,
+      success_rate: Math.round(
+        (successfulScrapes / enhancedCitations.length) * 100
+      ),
+      scraping_timestamp: new Date().toISOString(),
+      prd_version: "2.1_fixed",
+      is_summary_item: true,
     },
   },
-];
+});
+
+console.log(
+  `Returning ${outputItems.length} items (${scrapingResults.length} citations + 1 summary)`
+);
+
+return outputItems;
