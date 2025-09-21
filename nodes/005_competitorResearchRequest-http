@@ -1,11 +1,51 @@
 {
-  {
-    JSON.stringify({
-      model: "claude-3-5-sonnet-20240620",
-      max_tokens: 2000,
-      temperature: 0.1,
-      system: $json.research_prompt.system_content,
-      messages: [{ role: "user", content: $json.research_prompt.user_content }],
-    });
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": " 2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: \"claude-3-5-sonnet-20240620\",\n  max_tokens: 2000,\n  temperature: 0.1,\n  system: $json.research_prompt.system_content,\n  messages: [\n    { role: \"user\", content: $json.research_prompt.user_content }\n  ]\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        -112
+      ],
+      "id": "competitor-research-request",
+      "name": "005_competitorResearchRequest-http",
+      "credentials": {
+        "anthropicApi": {
+          "id": "1jk5Er35vKWwOaad",
+          "name": "Anthropic account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "005_competitorResearchRequest-http": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e627ba3cf413f5c8fbbcb0c34adbe72399de282a282eb839e23356d673f567eb"
   }
 }

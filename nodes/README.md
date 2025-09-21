@@ -58,22 +58,26 @@ The Competitive Echo workflow is a sophisticated n8n automation that performs co
 ## 📋 Workflow Phases
 
 ### Phase 1: Data Preparation (Nodes 003-006)
+
 - **003_parseGroupData.js**: Parse CSV data and extract brand information
 - **004_researchAdditionalCompetitors.js**: Determine if additional competitor research is needed
 - **005_competitorResearchRequest-http**: HTTP request for competitor research
 - **006_mergeCompetitorResearch.js**: Merge research results with original data
 
 ### Phase 2: Scenario Generation (Nodes 007-009)
+
 - **007_preparePrompt31.js**: Generate dynamic competitive analysis scenarios
 - **008_prompt31Request-http**: HTTP request for scenario generation
 - **009_parsePrompt31.js**: Parse and validate generated scenarios
 
 ### Phase 3: Competitive Analysis (Nodes 011-013)
+
 - **011_prompt32Request-http**: HTTP request for competitive analysis
 - **012_formatPrompt32.js**: Format competitive analysis responses
 - **013_prompt32Formatter.js**: Convert responses to structured format
 
 ### Phase 4: Source Research & Citations (Nodes 014b, 015a-015d, 016-018)
+
 - **014b_prompt32CitationRequest-http**: HTTP request for citations
 - **015a_sourceDetailExtractor.js**: Extract granular source details
 - **015b_sourceResearch.js**: Generate source research requests
@@ -84,6 +88,7 @@ The Competitive Echo workflow is a sophisticated n8n automation that performs co
 - **018_webscraper.js**: Web scraping for real-time data
 
 ### Phase 5: Report Generation & Deployment (Nodes 021-029)
+
 - **021_dataFormatForHtml.js**: Format data for HTML report generation
 - **022_generateHtmlReport.js**: Generate HTML report
 - **023_saveHTML.js**: Save HTML to file system
@@ -97,24 +102,28 @@ The Competitive Echo workflow is a sophisticated n8n automation that performs co
 ## 🔧 Key Features
 
 ### AI-Powered Analysis
+
 - **Claude 3.5 Sonnet**: For scenario generation and competitor research
 - **Claude 3.7 Sonnet**: For advanced competitive analysis
 - **Dynamic Prompting**: Industry-specific scenario generation
 - **Multi-format Support**: Handles various AI response formats
 
 ### Real-Time Data Processing
+
 - **Web Scraping**: Extract real-time metadata from URLs
 - **Source Research**: Comprehensive source analysis and verification
 - **Citation Management**: Advanced citation formatting and validation
 - **Data Merging**: Intelligent merging of multiple data sources
 
 ### Professional Reporting
+
 - **HTML Generation**: Professional, responsive HTML reports
 - **Automated Deployment**: Direct deployment to Vercel
 - **Slack Integration**: Automated notifications with deployment links
 - **Comprehensive Metrics**: Detailed performance and quality metrics
 
 ### Data Quality & Validation
+
 - **PRD v2.0 Compliance**: Follows Sentaiment Product Requirements Document
 - **Source Verification**: Authority scoring and verification status
 - **Error Handling**: Comprehensive error recovery and fallback mechanisms
@@ -133,17 +142,20 @@ Data Merging → HTML Generation → Vercel Deployment → Slack Notification
 ## 🛠️ Setup & Configuration
 
 ### Prerequisites
+
 - n8n instance (self-hosted or cloud)
 - Claude API access (Anthropic)
 - Vercel account and API access
 - Slack workspace with webhook URL
 
 ### Required Credentials
+
 - **Claude API**: For AI-powered analysis
 - **Vercel API**: For automated deployment
 - **Slack Webhook**: For notifications
 
 ### Installation
+
 1. Clone the repository
 2. Import the workflow JSON file into n8n
 3. Configure credentials for external services
@@ -153,6 +165,7 @@ Data Merging → HTML Generation → Vercel Deployment → Slack Notification
 ## 📈 Performance Metrics
 
 The workflow tracks comprehensive metrics including:
+
 - **Processing Times**: Node execution and total workflow duration
 - **Data Quality**: Citation authority scores and verification rates
 - **Source Diversity**: Geographic and temporal distribution of sources
@@ -162,12 +175,14 @@ The workflow tracks comprehensive metrics including:
 ## 🔍 Monitoring & Debugging
 
 ### Logging
+
 - Comprehensive console logging throughout the workflow
 - Detailed error messages with context
 - Processing metadata and timestamps
 - Performance metrics and statistics
 
 ### Error Handling
+
 - Graceful fallbacks for API failures
 - Data validation and sanitization
 - Multiple parsing attempts for malformed responses
@@ -176,7 +191,9 @@ The workflow tracks comprehensive metrics including:
 ## 📚 Documentation
 
 ### Node Documentation
+
 Each node includes detailed documentation covering:
+
 - Purpose and functionality
 - Input/output schemas
 - Configuration options
@@ -184,6 +201,7 @@ Each node includes detailed documentation covering:
 - Performance considerations
 
 ### API Integration
+
 - Claude API integration patterns
 - Vercel deployment API usage
 - Slack webhook implementation
@@ -192,6 +210,7 @@ Each node includes detailed documentation covering:
 ## 🤝 Contributing
 
 ### Development Guidelines
+
 - Follow the numbered node naming convention (003-029)
 - Include comprehensive error handling
 - Add detailed logging and debugging information
@@ -199,6 +218,7 @@ Each node includes detailed documentation covering:
 - Update documentation for any changes
 
 ### Testing
+
 - Test with sample CSV data
 - Verify all API integrations
 - Check error handling scenarios
@@ -254,11 +274,13 @@ This project is part of the Sentaiment organization and follows internal develop
 **Purpose:** Database operations and data management for source citations following Sentaiment PRD v2.0 standards.
 
 **Input:**
+
 - Enhanced citations from multiple sources
 - Source research data
 - Processing metadata
 
 **Output:**
+
 ```json
 {
   "citations_table_rows": [
@@ -301,6 +323,7 @@ This project is part of the Sentaiment organization and follows internal develop
 ```
 
 **Key Features:**
+
 - **Database Operations**: Manages citation data storage and retrieval
 - **PRD v2.0 Compliance**: Follows Sentaiment Product Requirements Document standards
 - **Data Normalization**: Ensures consistent data structure across all citations
@@ -314,10 +337,12 @@ This project is part of the Sentaiment organization and follows internal develop
 **Purpose:** Real-time source data extraction with URL extraction capabilities for enhanced metadata generation.
 
 **Input:**
+
 - Enhanced citations with source URLs
 - Various citation data formats
 
 **Output:**
+
 ```json
 {
   "scraping_results": [
@@ -353,6 +378,7 @@ This project is part of the Sentaiment organization and follows internal develop
 ```
 
 **Key Features:**
+
 - **URL Extraction Fix**: Handles source_url fields containing text with URLs in parentheses
 - **Enhanced Metadata Generation**: Intelligent metadata generation based on URL patterns
 - **Domain Analysis**: Calculates authority scores based on source domains
@@ -366,10 +392,12 @@ This project is part of the Sentaiment organization and follows internal develop
 **Purpose:** Format all workflow data for HTML report generation with comprehensive data merging and validation.
 
 **Input:**
+
 - Multiple data sources from workflow nodes
 - Scenario rankings, citations, and metadata
 
 **Output:**
+
 ```json
 {
   "report_metadata": {
@@ -405,6 +433,7 @@ This project is part of the Sentaiment organization and follows internal develop
 ```
 
 **Key Features:**
+
 - **Comprehensive Data Merging**: Combines data from all workflow phases
 - **Scenario Enhancement**: Fixes empty competitor arrays and missing data
 - **Company Name Extraction**: Intelligent extraction of target company name
@@ -418,14 +447,17 @@ This project is part of the Sentaiment organization and follows internal develop
 **Purpose:** Generate professional HTML reports from formatted data with responsive design and comprehensive metrics.
 
 **Input:**
+
 - Formatted data from dataFormatForHtml node
 
 **Output:**
+
 - Complete HTML report with embedded CSS and JavaScript
 - Professional styling and responsive design
 - Interactive elements and data visualizations
 
 **Key Features:**
+
 - **Professional Design**: Modern, responsive HTML layout
 - **Interactive Elements**: Dynamic data visualization and filtering
 - **Comprehensive Metrics**: Detailed performance and quality metrics
@@ -439,13 +471,16 @@ This project is part of the Sentaiment organization and follows internal develop
 **Purpose:** Save generated HTML report to file system with proper file naming and organization.
 
 **Input:**
+
 - HTML content from generateHtmlReport node
 
 **Output:**
+
 - Saved HTML file with timestamp-based naming
 - File system confirmation and metadata
 
 **Key Features:**
+
 - **Timestamp Naming**: Unique filenames based on generation time
 - **File Organization**: Proper directory structure for reports
 - **Error Handling**: Graceful handling of file system errors
@@ -458,13 +493,16 @@ This project is part of the Sentaiment organization and follows internal develop
 **Purpose:** Prepare files and configuration for Vercel deployment with proper project structure.
 
 **Input:**
+
 - HTML report and associated files
 
 **Output:**
+
 - Vercel-ready project structure
 - Configuration files and deployment metadata
 
 **Key Features:**
+
 - **Vercel Configuration**: Proper vercel.json configuration
 - **File Preparation**: Organizes files for deployment
 - **Environment Setup**: Configures environment variables
@@ -477,12 +515,15 @@ This project is part of the Sentaiment organization and follows internal develop
 **Purpose:** HTTP request template for uploading prepared files to Vercel for deployment.
 
 **Input:**
+
 - Prepared files and configuration from prepForVercel node
 
 **Output:**
+
 - Vercel deployment response with deployment ID and status
 
 **Configuration:**
+
 ```json
 {
   "method": "POST",
@@ -500,6 +541,7 @@ This project is part of the Sentaiment organization and follows internal develop
 ```
 
 **Key Features:**
+
 - **Vercel API Integration**: Direct integration with Vercel deployment API
 - **File Upload**: Handles multiple file uploads efficiently
 - **Error Handling**: Comprehensive error handling for deployment failures
@@ -512,13 +554,16 @@ This project is part of the Sentaiment organization and follows internal develop
 **Purpose:** Check Vercel deployment status and retrieve deployment information.
 
 **Input:**
+
 - Deployment ID from uploadToVercel node
 
 **Output:**
+
 - Deployment status and metadata
 - Deployment URL when ready
 
 **Key Features:**
+
 - **Status Monitoring**: Real-time deployment status checking
 - **URL Retrieval**: Extracts deployment URL when available
 - **Error Handling**: Handles deployment failures and timeouts
@@ -531,13 +576,16 @@ This project is part of the Sentaiment organization and follows internal develop
 **Purpose:** Extract and format deployment URL from Vercel deployment response.
 
 **Input:**
+
 - Vercel deployment response with status information
 
 **Output:**
+
 - Formatted deployment URL
 - URL metadata and accessibility status
 
 **Key Features:**
+
 - **URL Extraction**: Intelligently extracts deployment URL from response
 - **URL Validation**: Validates URL format and accessibility
 - **Error Handling**: Handles missing or invalid URLs
@@ -550,14 +598,17 @@ This project is part of the Sentaiment organization and follows internal develop
 **Purpose:** Generate comprehensive Slack notifications with deployment information and metrics.
 
 **Input:**
+
 - Deployment URL and report metadata
 - Processing metrics and statistics
 
 **Output:**
+
 - Formatted Slack message with rich formatting
 - Notification metadata and delivery status
 
 **Key Features:**
+
 - **Rich Formatting**: Professional Slack message formatting
 - **Comprehensive Metrics**: Includes processing statistics and performance data
 - **Deployment Links**: Direct links to generated reports
@@ -570,13 +621,16 @@ This project is part of the Sentaiment organization and follows internal develop
 **Purpose:** Send Slack notifications via webhook with comprehensive error handling.
 
 **Input:**
+
 - Formatted Slack message from slackNotification node
 
 **Output:**
+
 - Slack webhook response
 - Delivery confirmation and status
 
 **Configuration:**
+
 ```json
 {
   "method": "POST",
@@ -593,6 +647,7 @@ This project is part of the Sentaiment organization and follows internal develop
 ```
 
 **Key Features:**
+
 - **Webhook Integration**: Direct integration with Slack webhooks
 - **Rich Messages**: Support for Slack's rich message formatting
 - **Error Handling**: Comprehensive error handling for delivery failures
@@ -1385,6 +1440,7 @@ This project is part of the Sentaiment organization and follows internal develop
 ## Workflow Integration
 
 ### Data Flow Summary
+
 1. **Input Processing**: CSV data parsing and brand extraction
 2. **Research Phase**: Competitor research and scenario generation
 3. **Analysis Phase**: AI-powered competitive analysis
@@ -1393,6 +1449,7 @@ This project is part of the Sentaiment organization and follows internal develop
 6. **Notification**: Automated Slack notifications with deployment links
 
 ### Quality Assurance
+
 - **PRD v2.0 Compliance**: All nodes follow Sentaiment standards
 - **Error Recovery**: Comprehensive fallback mechanisms
 - **Data Validation**: Multi-layer data validation and sanitization
@@ -1400,6 +1457,7 @@ This project is part of the Sentaiment organization and follows internal develop
 - **Performance Monitoring**: Detailed metrics and performance tracking
 
 ### Deployment Architecture
+
 - **n8n Workflow**: Core automation engine
 - **Claude AI**: Advanced analysis and content generation
 - **Vercel**: Automated deployment and hosting

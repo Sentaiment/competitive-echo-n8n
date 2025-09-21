@@ -1,0 +1,41 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "url": "=https://api.vercel.com/v13/deployments/{{$json.id}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"parameters\": {\n    \"method\": \"GET\",\n    \"url\": \"=https://api.vercel.com/v13/deployments/{{$json.id}}\",\n    \"authentication\": \"genericCredentialType\",\n    \"genericAuthType\": \"httpBearerAuth\",\n    \"sendHeaders\": true,\n    \"headerParameters\": {\n      \"parameters\": [\n        {\n          \"name\": \"Authorization\",\n          \"value\": \"Bearer YOUR_VERCEL_TOKEN\"\n        }\n      ]\n    },\n    \"options\": {\n      \"resolveWithFullResponse\": false\n    }\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6096,
+        112
+      ],
+      "id": "b351455e-7c61-425d-843b-9ab0ca5ff14e",
+      "name": "026_getDeployStatus-http",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "QEHbBOmsYQAoJS3z",
+          "name": "Bearer Auth account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "026_getDeployStatus-http": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e627ba3cf413f5c8fbbcb0c34adbe72399de282a282eb839e23356d673f567eb"
+  }
+}

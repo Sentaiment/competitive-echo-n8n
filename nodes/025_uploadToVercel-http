@@ -1,0 +1,59 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.vercel.com/v13/deployments?skipAutoDetectionConfirmation=1",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  // EITHER send \"name\"...\n  name: $json.projectName,\n  // ...OR if you want to target an existing project explicitly, use \"project\"\n  // project: $json.projectName,\n\n  files: [\n    { file: $json.filePath, data: $json.content }\n  ]\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5632,
+        112
+      ],
+      "id": "fd10dcab-aecb-45d7-b4df-ebfe7c5209f9",
+      "name": "025_uploadToVercel-http",
+      "credentials": {
+        "supabaseApi": {
+          "id": "aKzlxJJP6fWgOqQG",
+          "name": "Supabase account"
+        },
+        "vercelAiGatewayApi": {
+          "id": "uSqX1XZRDq4hZZLl",
+          "name": "Vercel AI Gateway account"
+        },
+        "httpBearerAuth": {
+          "id": "QEHbBOmsYQAoJS3z",
+          "name": "Bearer Auth account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "025_uploadToVercel-http": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e627ba3cf413f5c8fbbcb0c34adbe72399de282a282eb839e23356d673f567eb"
+  }
+}

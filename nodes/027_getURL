@@ -1,0 +1,45 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dc2014e9-63c0-4794-b1cc-5b4ec34f2b3f",
+              "name": "deploymentUrl",
+              "value": "=https://{{$json.url}}",
+              "type": "string"
+            },
+            {
+              "id": "1f97b037-22e7-498c-969c-387723bf69d5",
+              "name": "pageUrl",
+              "value": "={{   'https://' + $json.url + '/' +   ( ($json.filename || 'index.html') === 'index.html' ? '' : ($json.filename) )}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        6656,
+        -80
+      ],
+      "id": "f5ca0811-e99e-4ba5-b8f9-74c92045460d",
+      "name": "027_getURL"
+    }
+  ],
+  "connections": {
+    "027_getURL": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e627ba3cf413f5c8fbbcb0c34adbe72399de282a282eb839e23356d673f567eb"
+  }
+}
