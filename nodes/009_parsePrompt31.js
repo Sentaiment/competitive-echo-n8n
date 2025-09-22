@@ -3,6 +3,14 @@
 
 const resp = $input.first().json; // <-- read from upstream input
 
+// Preserve metadata from the original input
+const originalMetadata = {
+  whitelist: resp.whitelist || [],
+  business_context: resp.business_context || {},
+  system_content: resp.system_content,
+  user_content: resp.user_content,
+};
+
 function getText(r) {
   if (!r) return "";
   if (typeof r === "string") return r;
@@ -60,4 +68,17 @@ if (!Array.isArray(obj.source_citations)) {
   throw new Error("Missing 'source_citations' array (should be []).");
 }
 
-return [{ json: obj }];
+// Merge parsed scenarios with original metadata
+const output = {
+  ...obj,
+  ...originalMetadata,
+};
+
+console.log("=== PROMPT 31 PARSER OUTPUT ===");
+console.log("Scenarios parsed:", output.scenarios.length);
+console.log("Whitelist preserved:", output.whitelist.length);
+console.log("Whitelist contents:", output.whitelist);
+console.log("Business context:", Object.keys(output.business_context || {}));
+console.log("Full output keys:", Object.keys(output));
+
+return [{ json: output }];

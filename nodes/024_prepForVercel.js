@@ -16,17 +16,8 @@ return [
     json: {
       content: html,
       filePath,
-      // Dynamic project name based on company and timestamp
-      projectName:
-        (companyName
-          ? companyName
-              .toLowerCase()
-              .replace(/[^a-z0-9]/g, "-")
-              .replace(/-+/g, "-")
-              .replace(/^-|-$/g, "")
-          : "competitive-analysis") +
-        "-" +
-        new Date().toISOString().split("T")[0].replace(/-/g, ""),
+      // Use fixed project name for consistent URL
+      projectName: "competitive-echo-report",
     },
   },
 ];

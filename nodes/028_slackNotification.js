@@ -8,7 +8,7 @@ const inputData = $input.all();
 // Configuration - UPDATE THESE VALUES FOR YOUR SLACK SETUP
 const SLACK_CONFIG = {
   webhookUrl:
-    "https://hooks.slack.com/services/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",
+    "https://hooks.slack.com/services/YOUR_WEBHOOK_URL_HERE",
   channel: "#competitive-analysis",
   username: "Competitive Echo Bot",
   iconEmoji: ":chart_with_upwards_trend:",
@@ -137,98 +137,56 @@ function extractWorkflowData(data) {
 
 // Create Slack message
 function createSlackMessage(workflowData) {
-  const status =
-    workflowData.failedScenarios === 0
-      ? "✅ SUCCESS"
-      : "⚠️ COMPLETED WITH ERRORS";
-  const statusEmoji =
-    workflowData.failedScenarios === 0 ? ":white_check_mark:" : ":warning:";
+  // Get the Vercel URL from the workflow data
+  let vercelUrl = "URL not available";
 
-  // Create dynamic title with company name
-  const companyInfo = workflowData.companyName
-    ? ` for ${workflowData.companyName}`
-    : "";
-  const title = `${statusEmoji} Competitive Analysis Workflow${companyInfo} ${status}`;
+  // Look for deployment URL in the input data
+  const inputData = $input.all();
+  for (let i = 0; i < inputData.length; i++) {
+    const item = inputData[i];
+    const itemData = item.json || {};
 
-  // Calculate success rate safely
-  const successRate =
-    workflowData.totalScenarios > 0
-      ? Math.round(
-          (workflowData.successfulScenarios / workflowData.totalScenarios) * 100
-        )
-      : 0;
+    // Look for various URL fields that might contain the Vercel deployment URL
+    if (
+      itemData.deploymentUrl ||
+      itemData.pageUrl ||
+      itemData.url ||
+      itemData.deployment_url
+    ) {
+      vercelUrl =
+        itemData.deploymentUrl ||
+        itemData.pageUrl ||
+        itemData.url ||
+        itemData.deployment_url;
+      break;
+    }
+  }
 
+  // Create simple message with just company and URL
+  const companyName = workflowData.companyName || "Unknown Company";
   const message = {
     channel: SLACK_CONFIG.channel,
     username: SLACK_CONFIG.username,
     icon_emoji: SLACK_CONFIG.iconEmoji,
-    text: title,
+    text: `📊 Competitive Analysis Report Ready`,
     attachments: [
       {
-        color: workflowData.failedScenarios === 0 ? "good" : "warning",
+        color: "good",
         fields: [
           {
             title: "Company",
-            value: workflowData.companyName || "Unknown",
+            value: companyName,
             short: true,
           },
           {
-            title: "Domain",
-            value: workflowData.companyDomain || "N/A",
-            short: true,
-          },
-          {
-            title: "Total Items",
-            value: workflowData.totalScenarios.toString(),
-            short: true,
-          },
-          {
-            title: "Successful",
-            value: workflowData.successfulScenarios.toString(),
-            short: true,
-          },
-          {
-            title: "Failed",
-            value: workflowData.failedScenarios.toString(),
-            short: true,
-          },
-          {
-            title: "Success Rate",
-            value: `${successRate}%`,
-            short: true,
-          },
-          {
-            title: "Completion Time",
-            value: new Date(workflowData.completionTime).toLocaleString(),
-            short: true,
-          },
-          {
-            title: "Workflow URL",
-            value: `<${workflowData.workflowUrl}|View Workflow>`,
+            title: "Report URL",
+            value: `<${vercelUrl}|View Report>`,
             short: true,
           },
         ],
       },
     ],
   };
-
-  // Add error details if there are failures
-  if (workflowData.errors.length > 0) {
-    const errorText = workflowData.errors
-      .slice(0, 5) // Limit to first 5 errors
-      .map((err) => `• Item ${err.item}: ${err.error} (${err.httpCode})`)
-      .join("\n");
-
-    message.attachments.push({
-      color: "danger",
-      title: "Error Details",
-      text: errorText,
-      footer:
-        workflowData.errors.length > 5
-          ? `... and ${workflowData.errors.length - 5} more errors`
-          : "",
-    });
-  }
 
   return message;
 }
