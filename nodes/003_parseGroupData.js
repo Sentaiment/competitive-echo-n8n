@@ -1,7 +1,7 @@
-// Fixed Parse & Group Data for Wynn Las Vegas CSV structure
+// Parse & Group Data for generic Brands CSV structure
 const rows = $input.all().map((i) => i.json);
 
-console.log("=== PROCESSING WYNN DATA ===");
+console.log("=== PROCESSING BRAND DATA ===");
 console.log("Total rows:", rows.length);
 
 // Helper functions
@@ -77,6 +77,20 @@ console.log("- Competitors:", competitors);
 console.log("- Industry:", industry);
 console.log("- Whitelist:", whitelist);
 
+// Store company name in workflow context for later use
+try {
+  if (typeof $workflow !== "undefined") {
+    $workflow.context = $workflow.context || {};
+    $workflow.context.target_company = company;
+    console.log("Stored company in workflow context:", company);
+    console.log("Workflow context after setting:", $workflow.context);
+  } else {
+    console.log("$workflow not available in 003_parseGroupData");
+  }
+} catch (e) {
+  console.log("Could not store company in workflow context:", e.message);
+}
+
 // Build enhanced context for dynamic scenario generation
 const businessContext = {
   industry_type: industry,
@@ -85,10 +99,7 @@ const businessContext = {
   brand_voice: voice,
   brand_values: values,
   competitive_set: whitelist,
-  market_focus:
-    industry === "Hotels & Resorts"
-      ? "luxury hospitality and guest experience"
-      : "business solutions and customer experience",
+  market_focus: null,
 };
 
 return [

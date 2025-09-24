@@ -12,7 +12,7 @@ console.log("Results length:", input.results?.length || 0);
 // Debug the first few results to see their structure
 if (input.results && input.results.length > 0) {
   console.log("\n=== SAMPLE RESULTS DEBUG ===");
-  input.results.slice(0, 3).forEach((result, index) => {
+  input.results.forEach((result, index) => {
     console.log(`\nResult ${index + 1}:`);
     console.log("Keys:", Object.keys(result));
     console.log("Scenario ID:", result.scenario_id);
@@ -381,11 +381,11 @@ for (const scenario of scenarios) {
       const text = `${title || ""} ${description || ""}`.toLowerCase();
 
       if (text.includes("concierge") || text.includes("service quality")) {
-        return "concierge_services";
+        return "service_quality";
       } else if (text.includes("luxury") || text.includes("premium")) {
-        return "luxury_hospitality";
+        return "premium_positioning";
       } else if (text.includes("hotel") || text.includes("resort")) {
-        return "hospitality";
+        return "accommodation_services";
       } else if (text.includes("suite") || text.includes("accommodation")) {
         return "accommodation_services";
       } else if (text.includes("dining") || text.includes("restaurant")) {
@@ -393,7 +393,7 @@ for (const scenario of scenarios) {
       } else if (text.includes("entertainment") || text.includes("casino")) {
         return "entertainment_services";
       }
-      return "hospitality_services"; // Default fallback
+      return "business_services"; // Generic default fallback
     }
 
     // Helper function to extract meaningful user query
@@ -543,7 +543,7 @@ for (const scenario of scenarios) {
       // Look for patterns that might indicate more competitors
       const companyMentions =
         responseText.match(
-          /[A-Z][a-zA-Z\s&]+(?:Resort|Hotel|Casino|Las Vegas|Vegas)/g
+          /[A-Z][a-zA-Z\s&]+(?:Inc|Corp|Company|LLC|Ltd|Group|Systems|Solutions|Technologies|Services|Enterprises)/g
         ) || [];
       const uniqueCompanies = [...new Set(companyMentions)];
 
@@ -667,7 +667,7 @@ for (const scenario of scenarios) {
       scenario_title:
         scenario.scenario_title || `Scenario ${scenario.scenario_id}`,
       scenario_description: "",
-      dimension: "hospitality_services", // Better default than "unknown"
+      dimension: "business_services", // Generic default fallback
       user_query:
         scenario.scenario_title || `Analyze scenario ${scenario.scenario_id}`,
       competitors_ranked: [],

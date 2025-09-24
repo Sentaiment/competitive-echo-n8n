@@ -1,0 +1,120 @@
+{
+  "name": "529 Error Handling Workflow Example",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// Enhanced Rate Limiter with Error Handling and Exponential Backoff\n// This node processes scenarios with intelligent retry logic and rate limiting\n\nconst inputData = $input.first().json;\nconsole.log(\"=== ENHANCED RATE LIMITER ===\");\nconsole.log(\"Input data type:\", typeof inputData);\nconsole.log(\"Is array:\", Array.isArray(inputData));\n\n// Configuration for rate limiting and retry logic\nconst RATE_LIMIT_CONFIG = {\n  // Base delay between requests (in milliseconds)\n  baseDelay: 30000, // 30 seconds base delay (aggressive to prevent 529 errors)\n  \n  // Exponential backoff multiplier for overload errors\n  backoffMultiplier: 1.8,\n  \n  // Maximum delay between requests (in milliseconds)\n  maxDelay: 120000, // 2 minutes max\n  \n  // Maximum number of retries for overload errors\n  maxRetries: 5,\n  \n  // Error codes that should trigger backoff\n  retryableErrorCodes: [429, 529, 503, 502, 504],\n  \n  // Error codes that should trigger immediate retry with same delay\n  immediateRetryCodes: [500, 502, 503, 504],\n  \n  // Error codes that should trigger longer backoff\n  backoffRetryCodes: [429, 529]\n};\n\n// Handle the data structure - it's an array of scenario objects directly\nlet scenarios = [];\nif (Array.isArray(inputData)) {\n  scenarios = inputData;\n  console.log(\"Input data is directly an array of scenarios\");\n} else if (inputData.results && Array.isArray(inputData.results)) {\n  scenarios = inputData.results;\n  console.log(\"Found scenarios in 'results' array\");\n} else if (inputData.scenarios && Array.isArray(inputData.scenarios)) {\n  scenarios = inputData.scenarios;\n  console.log(\"Found scenarios in 'scenarios' array\");\n} else {\n  console.log(\"No scenarios found in expected locations\");\n  console.log(\"Available keys:\", Object.keys(inputData));\n}\n\nconsole.log(\"Total scenarios to process:\", scenarios.length);\n\n// If no scenarios found, return the original data to prevent workflow failure\nif (scenarios.length === 0) {\n  console.log(\"No scenarios found - passing through original data\");\n  return [\n    {\n      json: inputData,\n    },\n  ];\n}\n\n// Function to calculate delay with exponential backoff\nfunction calculateDelay(attempt, errorCode = null) {\n  let delay = RATE_LIMIT_CONFIG.baseDelay;\n  \n  // Apply exponential backoff for specific error codes\n  if (errorCode && RATE_LIMIT_CONFIG.backoffRetryCodes.includes(errorCode)) {\n    delay = RATE_LIMIT_CONFIG.baseDelay * Math.pow(RATE_LIMIT_CONFIG.backoffMultiplier, attempt);\n  }\n  \n  // Cap at maximum delay\n  delay = Math.min(delay, RATE_LIMIT_CONFIG.maxDelay);\n  \n  // Add some jitter to prevent thundering herd\n  const jitter = Math.random() * 2000; // 0-2 second jitter\n  delay += jitter;\n  \n  return Math.round(delay);\n}\n\n// Process each scenario individually with enhanced metadata\nconst scenarioResults = [];\n\nfor (let scenarioIndex = 0; scenarioIndex < scenarios.length; scenarioIndex++) {\n  const scenario = scenarios[scenarioIndex];\n  console.log(\n    `\\n--- Processing Scenario ${scenarioIndex + 1}/${scenarios.length} ---`\n  );\n  console.log(`Scenario: ${scenario.scenario_title || \"Unknown\"}`);\n\n  // Calculate delay for this scenario\n  const delayForThisScenario = calculateDelay(scenarioIndex);\n  \n  // Create the request data for this scenario with enhanced metadata\n  const requestData = {\n    scenario: scenario,\n    scenarioIndex: scenarioIndex,\n    totalScenarios: scenarios.length,\n    processing_metadata: {\n      totalScenarios: scenarios.length,\n      currentScenarioIndex: scenarioIndex,\n      delayBetweenRequests: delayForThisScenario,\n      sequentialProcessing: true,\n      rateLimitConfig: RATE_LIMIT_CONFIG,\n      retryLogic: {\n        maxRetries: RATE_LIMIT_CONFIG.maxRetries,\n        retryableErrorCodes: RATE_LIMIT_CONFIG.retryableErrorCodes,\n        immediateRetryCodes: RATE_LIMIT_CONFIG.immediateRetryCodes,\n        backoffRetryCodes: RATE_LIMIT_CONFIG.backoffRetryCodes\n      },\n      processingTimestamp: new Date().toISOString(),\n      estimatedCompletionTime: new Date(Date.now() + (delayForThisScenario * (scenarios.length - scenarioIndex))).toISOString()\n    },\n  };\n\n  scenarioResults.push({\n    json: requestData,\n  });\n}\n\nconsole.log(`\\n=== ENHANCED RATE LIMITING COMPLETE ===`);\nconsole.log(`Created ${scenarioResults.length} individual scenario requests`);\nconsole.log(`Total scenarios to process: ${scenarios.length}`);\nconsole.log(`Base delay: ${RATE_LIMIT_CONFIG.baseDelay}ms`);\nconsole.log(`Max delay: ${RATE_LIMIT_CONFIG.maxDelay}ms`);\nconsole.log(`Estimated total processing time: ${Math.round((RATE_LIMIT_CONFIG.baseDelay * scenarios.length) / 1000)} seconds`);\n\n// Return all scenarios individually\nreturn scenarioResults;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "id": "rate-limiter",
+      "name": "Enhanced Rate Limiter"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pre-Request Delay Node\n// Adds intelligent delays before HTTP requests to prevent overload\n\nconsole.log(\"=== PRE-REQUEST DELAY NODE ===\");\n\nconst inputData = $input.all();\nconsole.log(\"Processing\", inputData.length, \"items for pre-request delays\");\n\n// Configuration for pre-request delays\nconst DELAY_CONFIG = {\n  // Base delay between requests (in milliseconds)\n  baseDelay: 45000, // 45 seconds (aggressive to prevent 529 errors)\n  \n  // Additional delay if previous request had errors\n  errorDelayMultiplier: 2.0,\n  \n  // Maximum delay (in milliseconds)\n  maxDelay: 300000, // 5 minutes\n  \n  // Minimum delay (in milliseconds)\n  minDelay: 5000, // 5 seconds\n  \n  // Delay multiplier for retry attempts\n  retryDelayMultiplier: 1.5,\n  \n  // Jitter percentage (0.0 to 1.0)\n  jitterPercentage: 0.3\n};\n\n// Track request history for intelligent delays\nlet requestCount = 0;\nlet errorCount = 0;\nlet lastRequestTime = Date.now();\n\n// Function to calculate delay based on context\nfunction calculateDelay(itemData) {\n  let delay = DELAY_CONFIG.baseDelay;\n  \n  // Increase delay if this is a retry attempt\n  const retryAttempt = itemData.retryAttempt || 0;\n  if (retryAttempt > 0) {\n    delay *= Math.pow(DELAY_CONFIG.retryDelayMultiplier, retryAttempt);\n    console.log(`🔄 Retry attempt ${retryAttempt} - increasing delay`);\n  }\n  \n  // Increase delay if we've had recent errors\n  if (errorCount > 0) {\n    delay *= Math.pow(DELAY_CONFIG.errorDelayMultiplier, Math.min(errorCount, 3));\n    console.log(`⚠️ Recent errors detected (${errorCount}) - increasing delay`);\n  }\n  \n  // Apply minimum and maximum bounds\n  delay = Math.max(delay, DELAY_CONFIG.minDelay);\n  delay = Math.min(delay, DELAY_CONFIG.maxDelay);\n  \n  // Add jitter to prevent synchronized requests\n  const jitter = delay * DELAY_CONFIG.jitterPercentage * Math.random();\n  delay += jitter;\n  \n  return Math.round(delay);\n}\n\n// Process each input item\nconst results = [];\n\nfor (let i = 0; i < inputData.length; i++) {\n  const item = inputData[i];\n  const itemData = item.json || {};\n  \n  requestCount++;\n  \n  console.log(`\\n--- Processing Request ${requestCount} ---`);\n  console.log(`Item: ${i + 1}/${inputData.length}`);\n  \n  // Calculate delay for this request\n  const delay = calculateDelay(itemData);\n  \n  console.log(`⏰ Calculated delay: ${Math.round(delay / 1000)} seconds`);\n  console.log(`🕐 Request will execute at: ${new Date(Date.now() + delay).toLocaleString()}`);\n  \n  // Add delay metadata\n  const delayedData = {\n    ...itemData,\n    delayMetadata: {\n      calculatedDelay: delay,\n      requestCount: requestCount,\n      errorCount: errorCount,\n      retryAttempt: itemData.retryAttempt || 0,\n      delayTimestamp: new Date().toISOString(),\n      estimatedExecutionTime: new Date(Date.now() + delay).toISOString(),\n      timeSinceLastRequest: Date.now() - lastRequestTime\n    }\n  };\n  \n  // Create result with delay\n  results.push({\n    json: delayedData,\n    delay: delay\n  });\n  \n  // Update tracking\n  lastRequestTime = Date.now() + delay;\n  \n  // Check if this is a retry (which indicates a previous error)\n  if (itemData.retryAttempt && itemData.retryAttempt > 0) {\n    errorCount++;\n    console.log(`📊 Error count updated: ${errorCount}`);\n  } else {\n    // Gradually decrease error count for successful requests\n    if (errorCount > 0) {\n      errorCount = Math.max(0, errorCount - 1);\n    }\n  }\n}\n\nconsole.log(`\\n=== PRE-REQUEST DELAY COMPLETE ===`);\nconsole.log(`Processed ${inputData.length} requests`);\nconsole.log(`Total requests: ${requestCount}`);\nconsole.log(`Error count: ${errorCount}`);\nconsole.log(`Average delay: ${Math.round(results.reduce((sum, r) => sum + r.delay, 0) / results.length)}ms`);\n\n// Log delay summary\nconst delays = results.map(r => r.delay);\nconst minDelay = Math.min(...delays);\nconst maxDelay = Math.max(...delays);\nconst avgDelay = delays.reduce((sum, d) => sum + d, 0) / delays.length;\n\nconsole.log(`📊 Delay statistics:`);\nconsole.log(`   Min: ${Math.round(minDelay / 1000)}s`);\nconsole.log(`   Max: ${Math.round(maxDelay / 1000)}s`);\nconsole.log(`   Avg: ${Math.round(avgDelay / 1000)}s`);\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "id": "pre-request-delay",
+      "name": "Pre-Request Delay"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": " 2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n    model: \"claude-3-5-sonnet-20240620\",\n    max_tokens: 3000,\n    temperature: 0.2,\n    system: $json.system_content,\n    messages: [\n      { role: \"user\", content: $json.user_content }\n    ]\n  }) }}",
+        "options": {
+          "retry": {
+            "enabled": true,
+            "maxRetries": 3,
+            "retryDelay": 30000,
+            "retryOnFail": true
+          },
+          "timeout": 240000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "id": "http-request",
+      "name": "HTTP Request with Retry",
+      "credentials": {
+        "anthropicApi": {
+          "id": "your-anthropic-credential-id",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Custom Retry Handler for 529 Overloaded Errors\n// This node implements intelligent retry logic with exponential backoff\n\nconsole.log(\"=== CUSTOM RETRY HANDLER FOR 529 ERRORS ===\");\n\nconst inputData = $input.all();\nconsole.log(\"Processing\", inputData.length, \"items for custom retry handling\");\n\n// Configuration for retry handling\nconst RETRY_CONFIG = {\n  // Maximum number of retries for 529 errors\n  maxRetries: 6,\n  \n  // Base delay for first retry (in milliseconds)\n  baseDelay: 60000, // 60 seconds (aggressive to handle 529 errors)\n  \n  // Exponential backoff multiplier\n  backoffMultiplier: 2.0,\n  \n  // Maximum delay between retries (in milliseconds)\n  maxDelay: 600000, // 10 minutes\n  \n  // Minimum delay between retries (in milliseconds)\n  minDelay: 10000, // 10 seconds\n  \n  // Error codes that should trigger custom retry\n  retryableErrorCodes: [529, 429, 503, 502, 504],\n  \n  // Success threshold - if we get this many successes, reset retry count\n  successThreshold: 3\n};\n\n// Track retry attempts globally\nlet globalRetryCount = 0;\nlet consecutiveSuccesses = 0;\n\n// Function to calculate retry delay with exponential backoff\nfunction calculateRetryDelay(attempt, errorCode = 529) {\n  let delay = RETRY_CONFIG.baseDelay;\n  \n  // Apply exponential backoff\n  delay = delay * Math.pow(RETRY_CONFIG.backoffMultiplier, attempt);\n  \n  // Cap at maximum delay\n  delay = Math.min(delay, RETRY_CONFIG.maxDelay);\n  \n  // Ensure minimum delay\n  delay = Math.max(delay, RETRY_CONFIG.minDelay);\n  \n  // Add jitter to prevent thundering herd (20% of delay)\n  const jitter = Math.random() * (delay * 0.2);\n  delay += jitter;\n  \n  return Math.round(delay);\n}\n\n// Function to check if an error is retryable\nfunction isRetryableError(error) {\n  if (!error) return false;\n  \n  // Check for 529 error in various formats\n  const httpCode = error.httpCode || error.code || error.status;\n  if (httpCode && RETRY_CONFIG.retryableErrorCodes.includes(parseInt(httpCode))) {\n    return true;\n  }\n  \n  // Check for overloaded error messages\n  const errorMessage = (error.errorMessage || error.message || \"\").toLowerCase();\n  if (errorMessage.includes(\"overloaded\") || errorMessage.includes(\"rate limit\")) {\n    return true;\n  }\n  \n  return false;\n}\n\n// Function to extract error details\nfunction extractErrorDetails(item) {\n  const itemData = item.json || {};\n  \n  // Look for error in various locations\n  const error = itemData.error || itemData.errorDetails || {};\n  const httpCode = error.httpCode || error.code || error.status;\n  const errorMessage = error.errorMessage || error.message || itemData.errorMessage || \"Unknown error\";\n  \n  return {\n    httpCode: httpCode ? parseInt(httpCode) : null,\n    errorMessage: errorMessage,\n    originalError: error,\n    itemData: itemData\n  };\n}\n\n// Process each input item\nconst results = [];\n\nfor (let i = 0; i < inputData.length; i++) {\n  const item = inputData[i];\n  console.log(`\\n--- Processing Item ${i + 1}/${inputData.length} ---`);\n  \n  const errorDetails = extractErrorDetails(item);\n  const itemData = item.json || {};\n  \n  // Check if this item has a retryable error\n  if (isRetryableError(errorDetails)) {\n    const currentAttempt = itemData.retryAttempt || 0;\n    const httpCode = errorDetails.httpCode || 529;\n    \n    console.log(`🚨 Retryable error detected: HTTP ${httpCode}`);\n    console.log(`📝 Error message: ${errorDetails.errorMessage}`);\n    console.log(`🔄 Current attempt: ${currentAttempt + 1}/${RETRY_CONFIG.maxRetries}`);\n    \n    if (currentAttempt < RETRY_CONFIG.maxRetries) {\n      const nextAttempt = currentAttempt + 1;\n      const retryDelay = calculateRetryDelay(currentAttempt, httpCode);\n      \n      console.log(`✅ Scheduling retry ${nextAttempt}/${RETRY_CONFIG.maxRetries}`);\n      console.log(`⏰ Retry delay: ${Math.round(retryDelay / 1000)} seconds`);\n      console.log(`🕐 Retry time: ${new Date(Date.now() + retryDelay).toLocaleString()}`);\n      \n      // Create retry request with enhanced metadata\n      const retryData = {\n        ...itemData,\n        retryAttempt: nextAttempt,\n        retryMetadata: {\n          originalError: errorDetails,\n          httpCode: httpCode,\n          attempt: nextAttempt,\n          maxRetries: RETRY_CONFIG.maxRetries,\n          retryDelay: retryDelay,\n          retryTimestamp: new Date().toISOString(),\n          estimatedRetryTime: new Date(Date.now() + retryDelay).toISOString(),\n          globalRetryCount: globalRetryCount + 1,\n          consecutiveSuccesses: consecutiveSuccesses\n        },\n        // Clear the error so it can be retried\n        error: null,\n        errorMessage: null,\n        errorDetails: null\n      };\n      \n      // Add delay instruction for n8n\n      results.push({\n        json: retryData,\n        delay: retryDelay\n      });\n      \n      globalRetryCount++;\n      continue;\n    } else {\n      console.log(`❌ Maximum retries exceeded (${RETRY_CONFIG.maxRetries})`);\n      console.log(`💀 Giving up on this request after ${currentAttempt} attempts`);\n    }\n  } else if (errorDetails.httpCode || errorDetails.errorMessage) {\n    console.log(`❌ Non-retryable error: HTTP ${errorDetails.httpCode}`);\n    console.log(`📝 Error message: ${errorDetails.errorMessage}`);\n  } else {\n    console.log(`✅ No errors detected - request successful`);\n    consecutiveSuccesses++;\n    \n    // Reset retry count if we have enough consecutive successes\n    if (consecutiveSuccesses >= RETRY_CONFIG.successThreshold) {\n      globalRetryCount = 0;\n      console.log(`🎉 Reset global retry count after ${consecutiveSuccesses} consecutive successes`);\n    }\n  }\n  \n  // If we reach here, either no error, non-retryable error, or max retries exceeded\n  results.push(item);\n}\n\nconsole.log(`\\n=== CUSTOM RETRY HANDLING COMPLETE ===`);\nconsole.log(`Processed ${inputData.length} items`);\nconsole.log(`Results: ${results.length} items`);\n\n// Log summary\nconst retryCount = results.filter(item => \n  item.json && item.json.retryMetadata\n).length;\n\nconst errorCount = results.filter(item => \n  item.json && (item.json.error || item.json.errorMessage || item.json.errorDetails)\n).length;\n\nconsole.log(`🔄 Items scheduled for retry: ${retryCount}`);\nconsole.log(`❌ Items with errors: ${errorCount}`);\nconsole.log(`✅ Successful items: ${results.length - retryCount - errorCount}`);\nconsole.log(`🌍 Global retry count: ${globalRetryCount}`);\nconsole.log(`🏆 Consecutive successes: ${consecutiveSuccesses}`);\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "id": "retry-handler",
+      "name": "Custom Retry Handler"
+    }
+  ],
+  "connections": {
+    "Enhanced Rate Limiter": {
+      "main": [
+        [
+          {
+            "node": "Pre-Request Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pre-Request Delay": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request with Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request with Retry": {
+      "main": [
+        [
+          {
+            "node": "Custom Retry Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

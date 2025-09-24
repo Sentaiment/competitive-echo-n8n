@@ -9,16 +9,80 @@
 
 console.log("=== ENHANCED DATA FORMATTER ===");
 
+// Disable all logging for production/non-debug runs
+console.log = () => {};
+
+// Try to get company name from workflow context first
+let targetCompany = "Unknown Company";
+try {
+  if (
+    typeof $workflow !== "undefined" &&
+    $workflow.context &&
+    $workflow.context.target_company
+  ) {
+    targetCompany = $workflow.context.target_company;
+    console.log("✅ Found company from workflow context:", targetCompany);
+  }
+} catch (e) {
+  console.log("⚠️ Could not access workflow context:", e.message);
+}
+
 // Get all input items
 const items = $input.all();
 console.log("Total input items:", items.length);
 
-// Initialize the target structure
-let formattedData = {
+// DEBUG: Show what we're actually receiving from Merge node
+console.log("\n=== DEBUGGING MERGE NODE INPUT ===");
+items.forEach((item, index) => {
+  const data = item.json || {};
+  console.log(`\nInput ${index}:`);
+  console.log("- Keys:", Object.keys(data));
+  console.log("- Has scenario_rankings:", !!data.scenario_rankings);
+  console.log("- Has scenarios:", !!data.scenarios);
+  console.log("- Has data_sources:", !!data.data_sources);
+  console.log("- Has source_citations:", !!data.source_citations);
+  console.log("- Has company:", !!data.company);
+  console.log("- Has report_metadata:", !!data.report_metadata);
+  if (data.scenario_rankings)
+    console.log("- scenario_rankings length:", data.scenario_rankings.length);
+  if (data.scenarios) console.log("- scenarios length:", data.scenarios.length);
+  if (data.data_sources)
+    console.log("- data_sources length:", data.data_sources.length);
+  if (data.source_citations)
+    console.log("- source_citations length:", data.source_citations.length);
+  console.log(
+    "- Sample data:",
+    JSON.stringify(data, null, 2).substring(0, 300) + "..."
+  );
+});
+
+// Check if we have input items
+if (items.length === 0) {
+  console.log(
+    "❌ NO INPUT ITEMS RECEIVED - MERGE NODE NOT CONNECTED OR NOT EXECUTING"
+  );
+  return [{ json: { error: "No input data received from Merge node" } }];
+}
+
+// Process the real data from 020_collectAllData
+console.log("✅ PROCESSING REAL DATA FROM 020_collectAllData");
+
+// SIMPLIFIED PROCESSING - Handle the exact data structure from 020_collectAllData
+console.log("=== SIMPLIFIED DATA PROCESSING ===");
+
+// Initialize with company name from workflow context
+let finalData = {
   report_metadata: {
-    company: "Unknown Company",
+    company: targetCompany,
     total_scenarios: 0,
     competitors_analyzed: [],
+    top_publishers: [],
+    evidence_summary: {
+      total_citations: 0,
+      verified_citations: 0,
+      high_authority_citations: 0,
+      unique_domains: 0,
+    },
   },
   scenarios: [],
   enhanced_citations: [],
@@ -27,6 +91,444 @@ let formattedData = {
   company_performance: {},
   quality_metrics: {},
 };
+
+// =========================
+// CANONICAL COMPETITOR NAMES (from whitelist)
+// =========================
+// Collect whitelist(s) emitted earlier in the flow (e.g., 003_parseGroupData)
+let canonicalWhitelist = [];
+items.forEach((item) => {
+  const data = item.json || {};
+  if (Array.isArray(data.whitelist) && data.whitelist.length > 0) {
+    canonicalWhitelist = canonicalWhitelist.concat(data.whitelist);
+  }
+});
+// Fallback: if no explicit whitelist, try competitors_analyzed or infer from scenarios later
+canonicalWhitelist = Array.from(
+  new Set((canonicalWhitelist || []).filter(Boolean))
+);
+
+function _normCompanyBaseName(name) {
+  const s = (name == null ? "" : String(name))
+    .normalize("NFKC")
+    .toLowerCase()
+    .trim()
+    .replace(/^the\s+/, "")
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return s;
+}
+
+function _buildCanonicalizer(whitelist) {
+  const wl = Array.from(new Set((whitelist || []).filter(Boolean)));
+  const exactMap = new Map();
+  const baseMap = new Map();
+  wl.forEach((w) => {
+    const wStr = String(w).trim();
+    const key = wStr.toLowerCase();
+    exactMap.set(key, wStr);
+    const base = _normCompanyBaseName(wStr);
+    if (base && !baseMap.has(base)) baseMap.set(base, wStr);
+  });
+
+  return function canonicalize(inputName) {
+    const raw = (inputName == null ? "" : String(inputName)).trim();
+    if (!raw) return raw;
+    const lower = raw.toLowerCase();
+    if (exactMap.has(lower)) return exactMap.get(lower);
+    const base = _normCompanyBaseName(raw);
+    if (baseMap.has(base)) return baseMap.get(base);
+    // Last resort: try contains-based match on base tokens
+    let best = raw;
+    let found = false;
+    for (const [b, val] of baseMap.entries()) {
+      if (base === b || base.includes(b) || b.includes(base)) {
+        best = val;
+        found = true;
+        break;
+      }
+    }
+    return found ? best : raw;
+  };
+}
+
+let canonicalizeCompany = _buildCanonicalizer(canonicalWhitelist);
+
+// Process each input item directly
+items.forEach((item, index) => {
+  const data = item.json || {};
+  console.log(`\n--- Processing Item ${index} ---`);
+  console.log("Keys:", Object.keys(data));
+  console.log(
+    "Full data structure:",
+    JSON.stringify(data, null, 2).substring(0, 500) + "..."
+  );
+
+  // EMERGENCY FIX: Check if this is the main scenario object from Merge node
+  if (
+    data.scenario_rankings &&
+    Array.isArray(data.scenario_rankings) &&
+    data.scenario_rankings.length > 0
+  ) {
+    console.log(
+      `🚨 EMERGENCY: Found main scenario object with ${data.scenario_rankings.length} scenario_rankings`
+    );
+    finalData.scenarios = finalData.scenarios.concat(data.scenario_rankings);
+    console.log(
+      `✅ Added ${data.scenario_rankings.length} scenarios from scenario_rankings`
+    );
+  }
+
+  if (
+    data.scenarios &&
+    Array.isArray(data.scenarios) &&
+    data.scenarios.length > 0
+  ) {
+    console.log(
+      `🚨 EMERGENCY: Found main scenario object with ${data.scenarios.length} scenarios`
+    );
+    finalData.scenarios = finalData.scenarios.concat(data.scenarios);
+    console.log(`✅ Added ${data.scenarios.length} scenarios from scenarios`);
+  }
+
+  // CRITICAL FIX: Handle the exact data structure from your example
+  if (data.scenario_rankings && Array.isArray(data.scenario_rankings)) {
+    console.log(
+      `🔧 CRITICAL: Processing ${data.scenario_rankings.length} scenario_rankings`
+    );
+    data.scenario_rankings.forEach((scenario, idx) => {
+      console.log(
+        `  Scenario ${idx + 1}: ${
+          scenario.scenario_title || scenario.title || "No title"
+        }`
+      );
+      console.log(
+        `  - Has competitors_ranked: ${!!scenario.competitors_ranked}`
+      );
+      console.log(`  - Has analysis_details: ${!!scenario.analysis_details}`);
+      console.log(`  - Has key_findings: ${!!scenario.key_findings}`);
+
+      // Convert scenario_ranking to the expected format
+      const convertedScenario = {
+        scenario_id: scenario.scenario_id || 0,
+        title:
+          scenario.scenario_title ||
+          scenario.title ||
+          `Scenario ${scenario.scenario_id || 0}`,
+        description:
+          scenario.scenario_description || scenario.description || "",
+        top_competitors: (scenario.competitors_ranked || []).map(
+          (comp, compIdx) => ({
+            company: canonicalizeCompany(comp.company || comp.name || comp),
+            score: comp.score || comp.rating || comp.value || null,
+            rationale:
+              comp.rationale ||
+              comp.reasoning ||
+              comp.explanation ||
+              comp.notes ||
+              "",
+            rank: comp.rank || comp.position || compIdx + 1,
+            detailed_metrics: comp.detailed_metrics || {},
+            ...comp,
+          })
+        ),
+        key_findings: scenario.key_findings || [],
+        sources: scenario.sources || [],
+        analysis_details: scenario.analysis_details || {},
+        dimension: scenario.dimension || "",
+        user_query: scenario.user_query || "",
+        data_quality_score: scenario.data_quality_score || 0,
+        processing_status: scenario.processing_status || "success",
+      };
+
+      finalData.scenarios.push(convertedScenario);
+      console.log(
+        `✅ Converted scenario ${scenario.scenario_id}: "${convertedScenario.title}"`
+      );
+    });
+  }
+
+  // Direct processing of scenario_rankings
+  if (data.scenario_rankings && Array.isArray(data.scenario_rankings)) {
+    console.log(`✅ Found ${data.scenario_rankings.length} scenario_rankings`);
+    finalData.scenarios = finalData.scenarios.concat(data.scenario_rankings);
+  }
+
+  // Direct processing of scenarios
+  if (data.scenarios && Array.isArray(data.scenarios)) {
+    console.log(`✅ Found ${data.scenarios.length} scenarios`);
+    finalData.scenarios = finalData.scenarios.concat(data.scenarios);
+  }
+
+  // EMERGENCY FIX: Check if this entire data object IS a scenario
+  if (data.scenario_id && data.scenario_title) {
+    console.log(`✅ Found individual scenario: ${data.scenario_title}`);
+    finalData.scenarios.push(data);
+  }
+
+  // Process citation objects (they're individual items in the array)
+  if (data.claim_text || data.source_url || data.authority_score) {
+    console.log(
+      `✅ Found citation object with claim: ${data.claim_text?.substring(
+        0,
+        50
+      )}...`
+    );
+    finalData.enhanced_citations.push(data);
+  }
+
+  // EMERGENCY FIX: Check for any array that might contain scenario data
+  Object.keys(data).forEach((key) => {
+    if (Array.isArray(data[key]) && data[key].length > 0) {
+      console.log(`🔍 Found array '${key}' with ${data[key].length} items`);
+      // Check if this looks like scenario data
+      const firstItem = data[key][0];
+      if (
+        firstItem &&
+        (firstItem.scenario_id || firstItem.scenario_title || firstItem.title)
+      ) {
+        console.log(`✅ '${key}' appears to contain scenario data`);
+        finalData.scenarios = finalData.scenarios.concat(data[key]);
+      }
+    }
+  });
+
+  // EMERGENCY FIX: Check if this is the main scenario object from Merge node
+  if (data.scenario_rankings && data.scenarios && data.company) {
+    console.log(`🚨 EMERGENCY: Found main scenario object from Merge node`);
+    console.log(`  - scenario_rankings: ${data.scenario_rankings.length}`);
+    console.log(`  - scenarios: ${data.scenarios.length}`);
+    console.log(`  - company: ${data.company}`);
+
+    // Process scenario_rankings
+    if (data.scenario_rankings.length > 0) {
+      finalData.scenarios = finalData.scenarios.concat(data.scenario_rankings);
+      console.log(
+        `✅ Added ${data.scenario_rankings.length} scenarios from scenario_rankings`
+      );
+    }
+
+    // Process scenarios
+    if (data.scenarios.length > 0) {
+      finalData.scenarios = finalData.scenarios.concat(data.scenarios);
+      console.log(`✅ Added ${data.scenarios.length} scenarios from scenarios`);
+    }
+  }
+
+  // Direct processing of enhanced_citations
+  if (data.enhanced_citations && Array.isArray(data.enhanced_citations)) {
+    console.log(
+      `✅ Found ${data.enhanced_citations.length} enhanced_citations`
+    );
+    finalData.enhanced_citations = finalData.enhanced_citations.concat(
+      data.enhanced_citations
+    );
+  }
+
+  // Direct processing of source_citations
+  if (data.source_citations && Array.isArray(data.source_citations)) {
+    console.log(`✅ Found ${data.source_citations.length} source_citations`);
+    finalData.enhanced_citations = finalData.enhanced_citations.concat(
+      data.source_citations
+    );
+  }
+
+  // Direct processing of data_sources (from Merge node)
+  if (data.data_sources && Array.isArray(data.data_sources)) {
+    console.log(`✅ Found ${data.data_sources.length} data_sources`);
+    finalData.enhanced_citations = finalData.enhanced_citations.concat(
+      data.data_sources
+    );
+  }
+
+  // Update company name from input
+  if (
+    data.report_metadata &&
+    data.report_metadata.company &&
+    data.report_metadata.company !== "Unknown Company"
+  ) {
+    finalData.report_metadata.company = data.report_metadata.company;
+    console.log(`✅ Updated company to: ${data.report_metadata.company}`);
+  }
+
+  // Fix company name if it's "Report" (from Merge node) with a neutral placeholder
+  if (data.company && data.company === "Report") {
+    finalData.report_metadata.company = "Unknown Company";
+    console.log(`✅ Fixed company from 'Report' to 'Unknown Company'`);
+  }
+
+  // Update total scenarios
+  if (data.report_metadata && data.report_metadata.total_scenarios) {
+    finalData.report_metadata.total_scenarios =
+      data.report_metadata.total_scenarios;
+  }
+
+  // Update competitors analyzed
+  if (data.report_metadata && data.report_metadata.competitors_analyzed) {
+    finalData.report_metadata.competitors_analyzed =
+      data.report_metadata.competitors_analyzed;
+  }
+
+  // EMERGENCY FIX: If we still have no scenarios, try to process the entire data object as a scenario
+  if (finalData.scenarios.length === 0 && data.scenario_id) {
+    console.log("🚨 EMERGENCY: Processing entire data object as scenario");
+    finalData.scenarios.push(data);
+  }
+
+  // EMERGENCY FIX: Check if this item has any scenario-like data
+  if (finalData.scenarios.length === 0) {
+    const hasScenarioData =
+      data.scenario_rankings ||
+      data.scenarios ||
+      data.scenario_id ||
+      data.scenario_title;
+    if (hasScenarioData) {
+      console.log("🚨 EMERGENCY: Found scenario data in item, processing...");
+      console.log("  - scenario_rankings:", !!data.scenario_rankings);
+      console.log("  - scenarios:", !!data.scenarios);
+      console.log("  - scenario_id:", !!data.scenario_id);
+      console.log("  - scenario_title:", !!data.scenario_title);
+
+      // Try to extract scenarios from any available source
+      if (data.scenario_rankings && Array.isArray(data.scenario_rankings)) {
+        finalData.scenarios = finalData.scenarios.concat(
+          data.scenario_rankings
+        );
+        console.log(
+          `✅ Added ${data.scenario_rankings.length} scenarios from scenario_rankings`
+        );
+      }
+      if (data.scenarios && Array.isArray(data.scenarios)) {
+        finalData.scenarios = finalData.scenarios.concat(data.scenarios);
+        console.log(
+          `✅ Added ${data.scenarios.length} scenarios from scenarios`
+        );
+      }
+      if (
+        data.scenario_id &&
+        data.scenario_title &&
+        !data.scenario_rankings &&
+        !data.scenarios
+      ) {
+        finalData.scenarios.push(data);
+        console.log(`✅ Added individual scenario: ${data.scenario_title}`);
+      }
+    }
+  }
+});
+
+// FINAL EMERGENCY CHECK: If we still have no scenarios, try one more time
+if (finalData.scenarios.length === 0) {
+  console.log(
+    "\n🚨 FINAL EMERGENCY CHECK: No scenarios found, trying one more time..."
+  );
+  items.forEach((item, index) => {
+    const data = item.json || {};
+    console.log(`Final check - Item ${index}:`, Object.keys(data));
+
+    // Check for any scenario data
+    if (data.scenario_rankings && Array.isArray(data.scenario_rankings)) {
+      console.log(
+        `🚨 FINAL: Found ${data.scenario_rankings.length} scenario_rankings`
+      );
+      finalData.scenarios = finalData.scenarios.concat(data.scenario_rankings);
+    }
+    if (data.scenarios && Array.isArray(data.scenarios)) {
+      console.log(`🚨 FINAL: Found ${data.scenarios.length} scenarios`);
+      finalData.scenarios = finalData.scenarios.concat(data.scenarios);
+    }
+    if (data.scenario_id && data.scenario_title) {
+      console.log(
+        `🚨 FINAL: Found individual scenario: ${data.scenario_title}`
+      );
+      finalData.scenarios.push(data);
+    }
+  });
+}
+
+// ULTIMATE EMERGENCY: If we still have no scenarios, create a placeholder from the citations
+if (finalData.scenarios.length === 0) {
+  // Do not create placeholder scenarios; leave empty to ensure fully dynamic output
+}
+
+// Remove hardcoded company rename logic to keep behavior fully data-driven
+
+// Calculate final metrics
+finalData.report_metadata.total_scenarios = finalData.scenarios.length;
+finalData.quality_metrics = {
+  total_citations: finalData.enhanced_citations.length,
+  high_authority_citations: finalData.enhanced_citations.filter(
+    (c) => (c.authority_score || 0) >= 8
+  ).length,
+  verified_citations: finalData.enhanced_citations.filter(
+    (c) => c.verification_status === "verified"
+  ).length,
+  real_time_sources: finalData.enhanced_citations.filter(
+    (c) => c.source_origin === "real_time_search"
+  ).length,
+  citation_authority_avg:
+    finalData.enhanced_citations.length > 0
+      ? (
+          finalData.enhanced_citations.reduce(
+            (sum, c) => sum + (c.authority_score || 0),
+            0
+          ) / finalData.enhanced_citations.length
+        ).toFixed(2)
+      : 0,
+  verification_rate:
+    finalData.enhanced_citations.length > 0
+      ? (
+          (finalData.enhanced_citations.filter(
+            (c) => c.verification_status === "verified"
+          ).length /
+            finalData.enhanced_citations.length) *
+          100
+        ).toFixed(1)
+      : 0,
+  company_performance: {},
+};
+
+console.log("\n=== FINAL PROCESSED DATA ===");
+console.log("Company:", finalData.report_metadata.company);
+console.log("Scenarios:", finalData.scenarios.length);
+console.log("Enhanced citations:", finalData.enhanced_citations.length);
+console.log("Total scenarios:", finalData.report_metadata.total_scenarios);
+
+// DEBUG: Show what we actually found
+if (finalData.scenarios.length === 0) {
+  console.log("\n❌ NO SCENARIOS FOUND - DEBUGGING INPUT STRUCTURE:");
+  items.forEach((item, index) => {
+    const data = item.json || {};
+    console.log(`\nInput ${index} structure:`);
+    console.log("- Keys:", Object.keys(data));
+    console.log("- Has scenario_rankings:", !!data.scenario_rankings);
+    console.log("- Has scenarios:", !!data.scenarios);
+    console.log("- Has scenario_id:", !!data.scenario_id);
+    console.log("- Has scenario_title:", !!data.scenario_title);
+    console.log("- Has company:", !!data.company);
+    if (data.scenario_rankings)
+      console.log("- scenario_rankings length:", data.scenario_rankings.length);
+    if (data.scenarios)
+      console.log("- scenarios length:", data.scenarios.length);
+    if (data.scenario_id) console.log("- scenario_id:", data.scenario_id);
+    if (data.scenario_title)
+      console.log("- scenario_title:", data.scenario_title);
+
+    // Show sample of the data structure
+    console.log(
+      "- Sample data:",
+      JSON.stringify(data, null, 2).substring(0, 300) + "..."
+    );
+  });
+}
+
+// Use the already initialized finalData instead of creating formattedData
+let formattedData = finalData;
+
+console.log("=== STARTING DATA ACCUMULATION ===");
+console.log("Initial formattedData structure:", Object.keys(formattedData));
 
 // Helper function to extract data from response_text when other fields are empty
 function extractFromResponseText(ranking) {
@@ -138,6 +640,49 @@ items.forEach((item, index) => {
   console.log(`\n--- Processing Item ${index} ---`);
   console.log("Available keys:", Object.keys(data));
 
+  // EMERGENCY FIX: If we have the exact data structure from 020_collectAllData, process it directly
+  if (data.scenario_rankings && data.scenario_rankings.length > 0) {
+    console.log(
+      "🚨 EMERGENCY FIX: Found scenario_rankings, processing directly"
+    );
+    formattedData.scenarios = formattedData.scenarios.concat(
+      data.scenario_rankings
+    );
+    console.log(
+      `Added ${data.scenario_rankings.length} scenarios from scenario_rankings`
+    );
+  }
+
+  if (data.enhanced_citations && data.enhanced_citations.length > 0) {
+    console.log(
+      "🚨 EMERGENCY FIX: Found enhanced_citations, processing directly"
+    );
+    formattedData.enhanced_citations = formattedData.enhanced_citations.concat(
+      data.enhanced_citations
+    );
+    console.log(
+      `Added ${data.enhanced_citations.length} citations from enhanced_citations`
+    );
+  }
+
+  if (data.scenarios && data.scenarios.length > 0) {
+    console.log("🚨 EMERGENCY FIX: Found scenarios, processing directly");
+    formattedData.scenarios = formattedData.scenarios.concat(data.scenarios);
+    console.log(`Added ${data.scenarios.length} scenarios from scenarios`);
+  }
+
+  // EMERGENCY FIX: Set company name from any available source
+  if (
+    data.report_metadata &&
+    data.report_metadata.company &&
+    data.report_metadata.company !== "Unknown Company"
+  ) {
+    formattedData.report_metadata.company = data.report_metadata.company;
+    console.log(
+      `🚨 EMERGENCY FIX: Set company to ${data.report_metadata.company}`
+    );
+  }
+
   // SCENARIO 1 SPECIFIC DEBUG
   console.log(`\n🔍 SCENARIO 1 DEBUG - Item ${index}:`);
   if (data.scenario_rankings && Array.isArray(data.scenario_rankings)) {
@@ -233,8 +778,17 @@ items.forEach((item, index) => {
   );
 
   // Handle scenario_rankings data FIRST (has complete data including response_text extraction)
-  if (data.scenario_rankings && Array.isArray(data.scenario_rankings)) {
-    console.log("Found scenario_rankings:", data.scenario_rankings.length);
+  if (
+    data.scenario_rankings &&
+    Array.isArray(data.scenario_rankings) &&
+    data.scenario_rankings.length > 0
+  ) {
+    console.log("✅ Found scenario_rankings:", data.scenario_rankings.length);
+    const sample = JSON.stringify(data.scenario_rankings[0], null, 2);
+    console.log(
+      "First scenario_ranking sample:",
+      sample ? sample.substring(0, 300) : "No data"
+    );
 
     // Debug: Check if scenarios have analysis_details
     data.scenario_rankings.forEach((ranking, index) => {
@@ -250,6 +804,10 @@ items.forEach((item, index) => {
 
     // Convert scenario_rankings to the target scenarios format (with response_text extraction)
     const convertedScenarios = data.scenario_rankings.map((ranking) => {
+      console.log(
+        `Processing scenario_ranking ${ranking.scenario_id}:`,
+        ranking.scenario_title
+      );
       // Extract from response_text if needed
       const enhancedRanking = extractFromResponseText(ranking);
 
@@ -274,7 +832,9 @@ items.forEach((item, index) => {
             enhancedRanking.competitors_ranked.length > 0
           ) {
             return enhancedRanking.competitors_ranked.map((comp) => {
-              const companyName = comp.company || comp.name || comp;
+              const companyName = canonicalizeCompany(
+                comp.company || comp.name || comp
+              );
 
               // Extract detailed metrics from analysis_details if available
               let detailedMetrics = {};
@@ -371,7 +931,7 @@ items.forEach((item, index) => {
                 .join(" | ");
 
               return {
-                company: companyName,
+                company: canonicalizeCompany(companyName),
                 score: overallScore,
                 rationale: rationale,
                 rank: index + 1,
@@ -409,8 +969,12 @@ items.forEach((item, index) => {
       };
     });
 
+    console.log(
+      `Adding ${convertedScenarios.length} converted scenarios to formattedData`
+    );
     formattedData.scenarios =
       formattedData.scenarios.concat(convertedScenarios);
+    console.log(`Total scenarios now: ${formattedData.scenarios.length}`);
   }
 
   // Handle results data (from Prompt 32 Formatter)
@@ -439,7 +1003,7 @@ items.forEach((item, index) => {
             result.competitors_ranked ||
             []
           ).map((comp) => ({
-            company: comp.company || comp.name || comp,
+            company: canonicalizeCompany(comp.company || comp.name || comp),
             score: comp.score || comp.rating || comp.value || null,
             rationale:
               comp.rationale ||
@@ -482,7 +1046,9 @@ items.forEach((item, index) => {
                     scenario.competitors ||
                     []
                   ).map((comp) => ({
-                    company: comp.company || comp.name || comp,
+                    company: canonicalizeCompany(
+                      comp.company || comp.name || comp
+                    ),
                     score: comp.score || comp.rating || comp.value || null,
                     rationale:
                       comp.rationale ||
@@ -519,7 +1085,9 @@ items.forEach((item, index) => {
                     ranking.competitors ||
                     []
                   ).map((comp) => {
-                    const companyName = comp.company || comp.name || comp;
+                    const companyName = canonicalizeCompany(
+                      comp.company || comp.name || comp
+                    );
 
                     // Extract detailed metrics from analysis_details if available
                     let detailedMetrics = {};
@@ -624,7 +1192,7 @@ items.forEach((item, index) => {
           "",
         // Preserve all competitor ranking data including scores, rationale, etc.
         top_competitors: (scenario.top_competitors || []).map((comp) => ({
-          company: comp.company || comp.name || comp,
+          company: canonicalizeCompany(comp.company || comp.name || comp),
           score: comp.score || comp.rating || comp.value || null,
           rationale:
             comp.rationale ||
@@ -671,7 +1239,7 @@ items.forEach((item, index) => {
           // First try to use existing top_competitors if it has data
           if (scenario.top_competitors && scenario.top_competitors.length > 0) {
             return scenario.top_competitors.map((comp) => ({
-              company: comp.company || comp.name || comp,
+              company: canonicalizeCompany(comp.company || comp.name || comp),
               score: comp.score || comp.rating || comp.value || null,
               rationale:
                 comp.rationale ||
@@ -728,7 +1296,7 @@ items.forEach((item, index) => {
                   .join(" | ");
 
                 return {
-                  company: companyName,
+                  company: canonicalizeCompany(companyName),
                   score: overallScore,
                   rationale: rationale,
                   rank: index + 1,
@@ -771,10 +1339,25 @@ items.forEach((item, index) => {
   }
 
   // Handle enhanced citations from multiple sources
-  if (data.enhanced_citations && Array.isArray(data.enhanced_citations)) {
-    console.log("Found enhanced_citations:", data.enhanced_citations.length);
+  if (
+    data.enhanced_citations &&
+    Array.isArray(data.enhanced_citations) &&
+    data.enhanced_citations.length > 0
+  ) {
+    console.log("✅ Found enhanced_citations:", data.enhanced_citations.length);
+    const sample = JSON.stringify(data.enhanced_citations[0], null, 2);
+    console.log(
+      "First enhanced_citation sample:",
+      sample ? sample.substring(0, 200) : "No data"
+    );
+    console.log(
+      `Adding ${data.enhanced_citations.length} enhanced citations to formattedData`
+    );
     formattedData.enhanced_citations = formattedData.enhanced_citations.concat(
       data.enhanced_citations
+    );
+    console.log(
+      `Total enhanced citations now: ${formattedData.enhanced_citations.length}`
     );
   }
 
@@ -989,6 +1572,129 @@ console.log(
   formattedData.data_sources_table.length
 );
 
+// Ingest nested merge outputs: some items come as { data: [ {...}, {...} ] }
+items.forEach((item, idx) => {
+  const root = item.json || {};
+  if (Array.isArray(root.data) && root.data.length > 0) {
+    console.log(
+      `🔄 Ingesting nested data array from item ${idx}:`,
+      root.data.length
+    );
+    root.data.forEach((d, j) => {
+      // Scenarios
+      if (
+        Array.isArray(d.scenario_rankings) &&
+        d.scenario_rankings.length > 0
+      ) {
+        formattedData.scenarios = formattedData.scenarios.concat(
+          d.scenario_rankings
+        );
+      }
+      if (Array.isArray(d.scenarios) && d.scenarios.length > 0) {
+        formattedData.scenarios = formattedData.scenarios.concat(d.scenarios);
+      }
+
+      // Citations and sources
+      if (
+        Array.isArray(d.enhanced_citations) &&
+        d.enhanced_citations.length > 0
+      ) {
+        formattedData.enhanced_citations =
+          formattedData.enhanced_citations.concat(d.enhanced_citations);
+      }
+      if (Array.isArray(d.source_citations) && d.source_citations.length > 0) {
+        formattedData.enhanced_citations =
+          formattedData.enhanced_citations.concat(d.source_citations);
+      }
+      if (
+        Array.isArray(d.data_sources_table) &&
+        d.data_sources_table.length > 0
+      ) {
+        formattedData.data_sources_table =
+          formattedData.data_sources_table.concat(d.data_sources_table);
+      }
+      if (Array.isArray(d.data_sources) && d.data_sources.length > 0) {
+        formattedData.data_sources_table =
+          formattedData.data_sources_table.concat(d.data_sources);
+      }
+
+      // Metadata
+      if (
+        d.report_metadata &&
+        d.report_metadata.company &&
+        d.report_metadata.company !== "Unknown Company"
+      ) {
+        formattedData.report_metadata.company = d.report_metadata.company;
+      }
+    });
+  }
+});
+
+// Normalize enhanced_citations (coerce strings → objects, fix empty URLs, infer domain)
+function _toStr(v) {
+  return (v == null ? "" : String(v)).trim();
+}
+function _isHttpUrl(s) {
+  const v = _toStr(s);
+  return /^https?:\/\//i.test(v);
+}
+function _domainOf(u) {
+  const s = _toStr(u);
+  if (!s) return "";
+  try {
+    return new URL(s).hostname.replace(/^www\./i, "").toLowerCase();
+  } catch {
+    return s
+      .replace(/^https?:\/\//i, "")
+      .replace(/^www\./i, "")
+      .split("/")[0]
+      .toLowerCase();
+  }
+}
+function _extractDomainFromText(text) {
+  const s = _toStr(text);
+  if (!s) return "";
+  const match = s.match(/\b([a-z0-9-]+\.)+[a-z]{2,}\b/i);
+  return match ? match[0].replace(/^www\./i, "").toLowerCase() : "";
+}
+
+formattedData.enhanced_citations = (formattedData.enhanced_citations || [])
+  .map((c) => {
+    if (typeof c === "string") {
+      const text = _toStr(c);
+      if (!text) return null;
+      let dom = _extractDomainFromText(text);
+      return {
+        claim_text: text,
+        claim_category: "competitive_analysis",
+        source_url: null,
+        source_domain: dom || null,
+        authority_score: 0,
+        verification_status: "",
+        author: "",
+        publication_date: "",
+      };
+    }
+    const obj = { ...(c || {}) };
+    const urlStr = _toStr(obj.source_url || obj.url || obj.source_domain);
+    if (urlStr) {
+      if (_isHttpUrl(urlStr)) {
+        obj.source_url = urlStr;
+      } else {
+        // If we have a bare domain or text containing a domain, coerce to https URL
+        const dom = _extractDomainFromText(urlStr) || _domainOf(urlStr);
+        obj.source_url = dom ? `https://${dom}` : null;
+      }
+    } else {
+      obj.source_url = null;
+    }
+    if (!obj.source_domain && obj.source_url) {
+      obj.source_domain = _domainOf(obj.source_url);
+    }
+    return obj;
+  })
+  .filter(Boolean);
+
 // If no scenarios found, provide detailed debugging information
 if (formattedData.scenarios.length === 0) {
   console.log("\n=== NO SCENARIOS FOUND - DEBUGGING INFO ===");
@@ -1005,23 +1711,25 @@ if (formattedData.scenarios.length === 0) {
     console.log("Is array:", Array.isArray(data));
 
     // Show sample of the data structure
-    if (data.scenario_rankings) {
+    if (data.scenario_rankings && data.scenario_rankings.length > 0) {
+      const sample = JSON.stringify(data.scenario_rankings[0], null, 2);
       console.log(
         "scenario_rankings sample:",
-        JSON.stringify(data.scenario_rankings[0], null, 2).substring(0, 200) +
-          "..."
+        sample ? sample.substring(0, 200) + "..." : "No data"
       );
     }
-    if (data.scenarios) {
+    if (data.scenarios && data.scenarios.length > 0) {
+      const sample = JSON.stringify(data.scenarios[0], null, 2);
       console.log(
         "scenarios sample:",
-        JSON.stringify(data.scenarios[0], null, 2).substring(0, 200) + "..."
+        sample ? sample.substring(0, 200) + "..." : "No data"
       );
     }
-    if (data.results) {
+    if (data.results && data.results.length > 0) {
+      const sample = JSON.stringify(data.results[0], null, 2);
       console.log(
         "results sample:",
-        JSON.stringify(data.results[0], null, 2).substring(0, 200) + "..."
+        sample ? sample.substring(0, 200) + "..." : "No data"
       );
     }
   });
@@ -1199,6 +1907,111 @@ uniqueScenarios.forEach((scenario) => {
 });
 
 // =========================
+// PER-SCENARIO DEDUPLICATION (after canonicalization)
+// =========================
+uniqueScenarios.forEach((scenario) => {
+  const list = Array.isArray(scenario.top_competitors)
+    ? scenario.top_competitors
+    : [];
+  const byCompany = new Map();
+  list.forEach((row) => {
+    const name = canonicalizeCompany(row.company || row.name || row);
+    if (!name) return;
+    const existing = byCompany.get(name);
+    if (!existing) {
+      byCompany.set(name, {
+        company: name,
+        score: row.score != null ? Number(row.score) : null,
+        rank: row.rank != null ? Number(row.rank) : null,
+        rationale: row.rationale || "",
+        detailed_metrics: { ...(row.detailed_metrics || {}) },
+        _ranks: row.rank != null ? [Number(row.rank)] : [],
+        _scores: row.score != null ? [Number(row.score)] : [],
+      });
+    } else {
+      if (row.rank != null) existing._ranks.push(Number(row.rank));
+      if (row.score != null) existing._scores.push(Number(row.score));
+      // Prefer the best (lowest) rank seen
+      const bestRank = existing._ranks.length
+        ? Math.min(...existing._ranks)
+        : null;
+      existing.rank = bestRank;
+      // Use max score if available
+      const bestScore = existing._scores.length
+        ? Math.max(...existing._scores)
+        : existing.score;
+      existing.score = bestScore;
+      // Merge rationale (dedupe by '; ')
+      const parts = [existing.rationale, row.rationale]
+        .filter(Boolean)
+        .map((s) => String(s).trim());
+      existing.rationale = Array.from(new Set(parts.join(" | ").split(" | ")))
+        .filter(Boolean)
+        .join(" | ");
+      // Merge metrics (prefer numeric values, keep first otherwise)
+      const dm = existing.detailed_metrics || {};
+      Object.entries(row.detailed_metrics || {}).forEach(([k, v]) => {
+        if (!(k in dm)) dm[k] = v;
+        else {
+          const a = Number(dm[k]);
+          const b = Number(v);
+          if (!Number.isNaN(b) && (Number.isNaN(a) || b > a)) dm[k] = v;
+        }
+      });
+      existing.detailed_metrics = dm;
+    }
+  });
+  // Rebuild list and re-rank by score desc then name
+  const merged = Array.from(byCompany.values()).sort((a, b) => {
+    const as = a.score == null ? -Infinity : Number(a.score);
+    const bs = b.score == null ? -Infinity : Number(b.score);
+    if (bs !== as) return bs - as;
+    return a.company.localeCompare(b.company);
+  });
+  merged.forEach((r, i) => {
+    r.rank = i + 1;
+  });
+  scenario.top_competitors = merged;
+});
+
+// =========================
+// ADD EVIDENCE QUALITY & CONFIDENCE INDICATORS
+// =========================
+uniqueScenarios.forEach((scenario) => {
+  // Calculate evidence quality metrics
+  const sources = scenario.sources || [];
+  const evidence_quality = {
+    total_citations: sources.length,
+    verified_sources: sources.filter(
+      (s) => s.verification_status === "verified"
+    ).length,
+    high_authority_sources: sources.filter((s) => (s.authority_score || 0) >= 7)
+      .length,
+    domains_represented: [
+      ...new Set(sources.map((s) => s.source_domain).filter(Boolean)),
+    ].length,
+  };
+
+  // Add confidence level based on evidence quality
+  let confidence_level = "pending";
+  if (
+    evidence_quality.verified_sources >= 2 ||
+    evidence_quality.high_authority_sources >= 2
+  ) {
+    confidence_level = "high";
+  } else if (
+    evidence_quality.total_citations >= 1 ||
+    evidence_quality.domains_represented >= 1
+  ) {
+    confidence_level = "medium";
+  }
+
+  // Add to scenario
+  scenario.evidence_quality = evidence_quality;
+  scenario.confidence_level = confidence_level;
+});
+
+// =========================
 // COMPANY NAME EXTRACTION FIX
 // =========================
 console.log("=== COMPANY NAME EXTRACTION FIX ===");
@@ -1208,17 +2021,14 @@ if (
   formattedData.report_metadata.competitors_analyzed &&
   formattedData.report_metadata.competitors_analyzed.length > 0
 ) {
-  // Look for "Wynn Las Vegas" specifically since that's your target company
-  const targetCompany = formattedData.report_metadata.competitors_analyzed.find(
-    (comp) => comp.includes("Wynn") || comp.includes("wynn")
-  );
+  const firstCompany =
+    formattedData.report_metadata.competitors_analyzed.find((comp) =>
+      typeof comp === "string" ? comp.trim().length > 0 : false
+    ) || null;
 
-  if (targetCompany) {
-    formattedData.report_metadata.company = targetCompany;
-    console.log(
-      "✅ Found target company in competitors_analyzed:",
-      targetCompany
-    );
+  if (firstCompany) {
+    formattedData.report_metadata.company = firstCompany;
+    console.log("✅ Found company in competitors_analyzed:", firstCompany);
   }
 }
 
@@ -1254,20 +2064,24 @@ if (
   }
 }
 
-// Method 3: Manual override for Wynn Las Vegas (based on your data structure)
+// Method 3: If still unknown, fall back to first scenario's top competitor
 if (formattedData.report_metadata.company === "Unknown Company") {
-  // Check if we have Wynn data specifically
-  const hasWynnData = uniqueScenarios.some(
+  const topFromScenario = uniqueScenarios.find(
     (scenario) =>
-      scenario.top_competitors &&
-      scenario.top_competitors.some(
-        (comp) => comp.company && comp.company.includes("Wynn")
-      )
+      Array.isArray(scenario.top_competitors) &&
+      scenario.top_competitors.length > 0
   );
-
-  if (hasWynnData) {
-    formattedData.report_metadata.company = "Wynn Las Vegas";
-    console.log("✅ Set company to Wynn Las Vegas based on competitor data");
+  if (topFromScenario) {
+    const inferred =
+      (
+        topFromScenario.top_competitors.find((c) => c.rank === 1) ||
+        topFromScenario.top_competitors[0] ||
+        {}
+      ).company || null;
+    if (inferred) {
+      formattedData.report_metadata.company = inferred;
+      console.log("✅ Inferred company from scenario data:", inferred);
+    }
   }
 }
 
@@ -1597,13 +2411,13 @@ const realTimeSources = formattedData.enhanced_citations.filter(
 formattedData.scenarios.forEach((scenario) => {
   // Win Rate: Percentage of scenarios where this company is in top 3
   const totalScenarios = formattedData.scenarios.length;
+  const reportCompanyName = (
+    formattedData.report_metadata.company || ""
+  ).toLowerCase();
   const scenariosWithCompany = formattedData.scenarios.filter((s) =>
     s.top_competitors.some(
       (comp) =>
-        (comp.company && comp.company.toLowerCase().includes("wynn")) ||
-        (comp.company && comp.company.toLowerCase().includes("venetian")) ||
-        (comp.company && comp.company.toLowerCase().includes("mgm")) ||
-        (comp.company && comp.company.toLowerCase().includes("fontainebleau"))
+        comp.company && comp.company.toLowerCase().includes(reportCompanyName)
     )
   ).length;
 
@@ -1747,6 +2561,66 @@ console.log(
   formattedData.report_metadata.competitors_analyzed.length
 );
 
+// CRITICAL DEBUG: Show what we actually have in formattedData
+console.log("\n=== CRITICAL DEBUG: FINAL FORMATTED DATA ===");
+console.log("formattedData.scenarios.length:", formattedData.scenarios.length);
+console.log(
+  "formattedData.enhanced_citations.length:",
+  formattedData.enhanced_citations.length
+);
+console.log(
+  "formattedData.data_sources_table.length:",
+  formattedData.data_sources_table.length
+);
+
+if (formattedData.scenarios.length > 0) {
+  console.log("✅ SCENARIOS FOUND:");
+  formattedData.scenarios.forEach((scenario, index) => {
+    console.log(
+      `  Scenario ${index + 1}: ${scenario.title || scenario.scenario_title}`
+    );
+    console.log(`    - Competitors: ${scenario.top_competitors?.length || 0}`);
+    console.log(`    - Key findings: ${scenario.key_findings?.length || 0}`);
+  });
+} else {
+  console.log("❌ NO SCENARIOS FOUND");
+}
+
+if (formattedData.enhanced_citations.length > 0) {
+  console.log("✅ ENHANCED CITATIONS FOUND:");
+  console.log(`  Total citations: ${formattedData.enhanced_citations.length}`);
+  console.log(
+    `  Sample citation: ${formattedData.enhanced_citations[0]?.claim_text?.substring(
+      0,
+      100
+    )}...`
+  );
+} else {
+  console.log("❌ NO ENHANCED CITATIONS FOUND");
+}
+
+// DEBUG: Show what we actually processed
+console.log("\n=== PROCESSING SUMMARY ===");
+console.log("Input items processed:", items.length);
+console.log("Scenarios found:", formattedData.scenarios.length);
+console.log(
+  "Enhanced citations found:",
+  formattedData.enhanced_citations.length
+);
+console.log("Data sources found:", formattedData.data_sources_table.length);
+
+if (formattedData.scenarios.length === 0) {
+  console.log("\n⚠️ NO SCENARIOS FOUND - CHECKING INPUT DATA:");
+  items.forEach((item, index) => {
+    const data = item.json || {};
+    console.log(`Input ${index}:`, Object.keys(data));
+    if (data.scenario_rankings)
+      console.log(`  - scenario_rankings: ${data.scenario_rankings.length}`);
+    if (data.scenarios) console.log(`  - scenarios: ${data.scenarios.length}`);
+    if (data.results) console.log(`  - results: ${data.results.length}`);
+  });
+}
+
 // Debug: Show enhanced scenario titles and descriptions
 console.log("\n=== ENHANCED SCENARIO TITLES & DESCRIPTIONS ===");
 formattedData.scenarios.forEach((scenario, index) => {
@@ -1813,5 +2687,39 @@ if (formattedData.data_sources_table.length > 0) {
     });
   });
 }
+
+// Calculate top publishers and evidence summary
+const domainCounts = {};
+const evidenceSummary = {
+  total_citations: 0,
+  verified_citations: 0,
+  high_authority_citations: 0,
+  unique_domains: 0,
+};
+
+// Count domains and evidence across all sources
+formattedData.data_sources_table.forEach((source) => {
+  if (source.source_domain) {
+    domainCounts[source.source_domain] =
+      (domainCounts[source.source_domain] || 0) + 1;
+  }
+  evidenceSummary.total_citations++;
+  if (source.verification_status === "verified")
+    evidenceSummary.verified_citations++;
+  if ((source.authority_score || 0) >= 7)
+    evidenceSummary.high_authority_citations++;
+});
+
+evidenceSummary.unique_domains = Object.keys(domainCounts).length;
+
+// Get top 5 publishers by citation count
+const topPublishers = Object.entries(domainCounts)
+  .sort(([, a], [, b]) => b - a)
+  .slice(0, 5)
+  .map(([domain, count]) => ({ domain, citation_count: count }));
+
+// Update report metadata
+formattedData.report_metadata.top_publishers = topPublishers;
+formattedData.report_metadata.evidence_summary = evidenceSummary;
 
 return [{ json: formattedData }];

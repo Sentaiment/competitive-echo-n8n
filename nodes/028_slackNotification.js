@@ -30,25 +30,74 @@ function extractWorkflowData(data) {
   console.log("=== DEBUGGING INPUT DATA ===");
   console.log("Total input items:", data.length);
 
+  // Try workflow context for target company first
+  try {
+    if (
+      typeof $workflow !== "undefined" &&
+      $workflow.context &&
+      $workflow.context.target_company
+    ) {
+      const ctxCompany = String($workflow.context.target_company).trim();
+      if (ctxCompany && ctxCompany !== "Unknown Company") {
+        results.companyName = ctxCompany;
+      }
+    }
+  } catch (e) {
+    console.log("Workflow context not available:", e.message);
+  }
+
   // Debug: Log first few items to understand structure
   data.slice(0, 3).forEach((item, index) => {
     console.log(`Item ${index}:`, JSON.stringify(item, null, 2));
   });
 
   // Extract company information from various possible sources
+  // Priority order: report_metadata.company > company > other fields
   for (let i = 0; i < data.length; i++) {
     const item = data[i];
     const itemData = item.json || {};
 
-    // Look for company name in various fields
+    // PRIMARY: Look for company name in report_metadata.company first (most reliable)
+    if (
+      !results.companyName &&
+      itemData.report_metadata &&
+      itemData.report_metadata.company
+    ) {
+      const companyName = itemData.report_metadata.company;
+      if (
+        companyName &&
+        companyName !== "Unknown Company" &&
+        companyName.trim() !== ""
+      ) {
+        results.companyName = companyName.trim();
+        console.log(
+          "✅ Found company name in report_metadata.company:",
+          results.companyName
+        );
+      }
+    }
+
+    // SECONDARY: Look for company name in other common fields
     if (!results.companyName) {
-      results.companyName =
-        itemData.company ||
-        itemData.brand_name ||
-        itemData.name ||
-        itemData.entity_name ||
-        itemData.brand ||
-        null;
+      const possibleCompanyNames = [
+        itemData.company,
+        itemData.brand_name,
+        itemData.name,
+        itemData.entity_name,
+        itemData.brand,
+        itemData.target_company,
+        itemData.company_name,
+      ].filter(
+        (name) => name && name !== "Unknown Company" && name.trim() !== ""
+      );
+
+      if (possibleCompanyNames.length > 0) {
+        results.companyName = possibleCompanyNames[0].trim();
+        console.log(
+          "✅ Found company name in secondary fields:",
+          results.companyName
+        );
+      }
     }
 
     // Look for domain in various fields
@@ -64,6 +113,124 @@ function extractWorkflowData(data) {
     // If we found both, we can break early
     if (results.companyName && results.companyDomain) {
       break;
+    }
+
+    // Check nested merge shape: itemData.data is an array of payloads
+    if (!results.companyName && Array.isArray(itemData.data)) {
+      for (const entry of itemData.data) {
+        // Check report_metadata.company first in nested data
+        if (entry && entry.report_metadata && entry.report_metadata.company) {
+          const companyName = entry.report_metadata.company;
+          if (
+            companyName &&
+            companyName !== "Unknown Company" &&
+            companyName.trim() !== ""
+          ) {
+            results.companyName = companyName.trim();
+            console.log(
+              "✅ Found company name in nested report_metadata.company:",
+              results.companyName
+            );
+            break;
+          }
+        }
+        // Fallback to other company fields in nested data
+        if (!results.companyName) {
+          const nestedCompany =
+            entry.company ||
+            entry.brand_name ||
+            entry.name ||
+            entry.entity_name;
+          if (
+            nestedCompany &&
+            nestedCompany !== "Unknown Company" &&
+            nestedCompany.trim() !== ""
+          ) {
+            results.companyName = nestedCompany.trim();
+            console.log(
+              "✅ Found company name in nested data:",
+              results.companyName
+            );
+            break;
+          }
+        }
+      }
+    }
+
+    // Check formatted report shape: scenarios/top_competitors (as a weak fallback)
+    if (
+      !results.companyName &&
+      Array.isArray(itemData.scenarios) &&
+      itemData.scenarios.length > 0
+    ) {
+      const firstScenario = itemData.scenarios[0];
+      if (
+        firstScenario &&
+        Array.isArray(firstScenario.top_competitors) &&
+        firstScenario.top_competitors.length > 0
+      ) {
+        const topCompany = firstScenario.top_competitors[0].company;
+        if (
+          topCompany &&
+          topCompany !== "Unknown Company" &&
+          topCompany.trim() !== ""
+        ) {
+          results.companyName = topCompany.trim();
+          console.log(
+            "✅ Found company name in scenarios:",
+            results.companyName
+          );
+        }
+      }
+    }
+  }
+
+  // Final fallback: scan entire dataset for any company name if still missing
+  if (!results.companyName) {
+    console.log(
+      "🔍 Final fallback: scanning entire dataset for company name..."
+    );
+    for (let i = 0; i < data.length; i++) {
+      const itemData = data[i].json || {};
+
+      // Try report_metadata.company first
+      if (itemData.report_metadata && itemData.report_metadata.company) {
+        const companyName = itemData.report_metadata.company;
+        if (
+          companyName &&
+          companyName !== "Unknown Company" &&
+          companyName.trim() !== ""
+        ) {
+          results.companyName = companyName.trim();
+          console.log(
+            "✅ Found company name in final fallback (report_metadata):",
+            results.companyName
+          );
+          break;
+        }
+      }
+
+      // Try other company fields
+      const fallbackFields = [
+        itemData.company,
+        itemData.brand_name,
+        itemData.name,
+        itemData.entity_name,
+        itemData.brand,
+        itemData.target_company,
+        itemData.company_name,
+      ].filter(
+        (name) => name && name !== "Unknown Company" && name.trim() !== ""
+      );
+
+      if (fallbackFields.length > 0) {
+        results.companyName = fallbackFields[0].trim();
+        console.log(
+          "✅ Found company name in final fallback (other fields):",
+          results.companyName
+        );
+        break;
+      }
     }
   }
 
@@ -163,12 +330,17 @@ function createSlackMessage(workflowData) {
   }
 
   // Create simple message with just company and URL
-  const companyName = workflowData.companyName || "Unknown Company";
+  const companyName = workflowData.companyName
+    ? String(workflowData.companyName).trim()
+    : "Unknown Company";
+
+  console.log("🏢 Final company name for Slack message:", companyName);
+
   const message = {
     channel: SLACK_CONFIG.channel,
     username: SLACK_CONFIG.username,
     icon_emoji: SLACK_CONFIG.iconEmoji,
-    text: `📊 Competitive Analysis Report Ready`,
+    text: `📊 Competitive Analysis Report Ready — ${companyName}`,
     attachments: [
       {
         color: "good",

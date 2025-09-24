@@ -1,19 +1,195 @@
 /**
  * n8n Code node (JavaScript)
- * Enhanced Data Collector - Replaces simple merge node with intelligent data merging
+ * Enhanced Data Collector - Fixed to properly get company name from upstream nodes
  *
  * Inputs:
  * - Input 0: From 013_prompt32Formatter (scenario data with competitors)
  * - Input 1: From 018_webscraper (citation data)
+ * - Input 2: (NEW) From 003_parseGroupData (company data) - CONNECT THIS!
  *
  * Output: Merged data with enhanced scenarios and citations for HTML report generation
  */
 
-console.log("=== ENHANCED DATA COLLECTOR ===");
+console.log("=== ENHANCED DATA COLLECTOR (FIXED) ===");
 
 // Get all input items
 const inputItems = $input.all();
 console.log("Total input items:", inputItems.length);
+
+// DEBUG: Show what we're actually receiving
+console.log("\n=== DEBUGGING INPUT DATA ===");
+inputItems.forEach((item, index) => {
+  const data = item.json || {};
+  console.log(`\nInput ${index}:`);
+  console.log("- Keys:", Object.keys(data));
+  console.log("- Has scenario_rankings:", !!data.scenario_rankings);
+  console.log("- Has scenarios:", !!data.scenarios);
+  console.log("- Has enhanced_citations:", !!data.enhanced_citations);
+  console.log("- Has source_citations:", !!data.source_citations);
+  console.log("- Has company:", !!data.company);
+  console.log("- Has report_metadata:", !!data.report_metadata);
+  if (data.scenario_rankings)
+    console.log("- scenario_rankings length:", data.scenario_rankings.length);
+  if (data.scenarios) console.log("- scenarios length:", data.scenarios.length);
+  if (data.enhanced_citations)
+    console.log("- enhanced_citations length:", data.enhanced_citations.length);
+  if (data.source_citations)
+    console.log("- source_citations length:", data.source_citations.length);
+  console.log(
+    "- Sample data:",
+    JSON.stringify(data, null, 2).substring(0, 200) + "..."
+  );
+});
+
+// Enhanced company name detection
+let targetCompany = "Unknown Company";
+let companySource = "default";
+let companyLocked = false;
+
+// Method 1: Look for company data in input items (most reliable)
+console.log("🔍 Searching for company data in inputs...");
+
+for (const item of inputItems) {
+  const data = item.json || {};
+
+  // Direct company field
+  if (data.company && data.company !== "Unknown Company") {
+    targetCompany = data.company;
+    companySource = "direct_input";
+    companyLocked = true;
+    console.log("✅ Found company from direct input:", targetCompany);
+    break;
+  }
+
+  // Company in business_context
+  if (data.business_context && data.business_context.company) {
+    targetCompany = data.business_context.company;
+    companySource = "business_context";
+    companyLocked = true;
+    console.log("✅ Found company from business_context:", targetCompany);
+    break;
+  }
+
+  // Company in report_metadata
+  if (
+    data.report_metadata &&
+    data.report_metadata.company &&
+    data.report_metadata.company !== "Unknown Company"
+  ) {
+    targetCompany = data.report_metadata.company;
+    companySource = "report_metadata";
+    companyLocked = true;
+    console.log("✅ Found company from report_metadata:", targetCompany);
+    break;
+  }
+
+  // Look in scenario data for frequently mentioned company
+  if (data.scenario_rankings && Array.isArray(data.scenario_rankings)) {
+    const companyMentions = {};
+
+    data.scenario_rankings.forEach((scenario) => {
+      if (
+        scenario.competitors_ranked &&
+        Array.isArray(scenario.competitors_ranked)
+      ) {
+        scenario.competitors_ranked.forEach((comp) => {
+          if (comp.company && comp.company !== "Unknown Company") {
+            companyMentions[comp.company] =
+              (companyMentions[comp.company] || 0) + 1;
+          }
+        });
+      }
+    });
+
+    // Get most mentioned company
+    const mostMentioned = Object.entries(companyMentions).sort(
+      ([, a], [, b]) => b - a
+    )[0];
+
+    if (mostMentioned && mostMentioned[1] > 1) {
+      // Mentioned more than once
+      targetCompany = mostMentioned[0];
+      companySource = "scenario_analysis";
+      console.log(
+        `✅ Found company from scenario analysis: ${targetCompany} (mentioned ${mostMentioned[1]} times)`
+      );
+      break;
+    }
+  }
+}
+
+// Method 2: Try workflow context as backup
+if (targetCompany === "Unknown Company") {
+  console.log("🔍 Trying workflow context...");
+  try {
+    if (
+      typeof $workflow !== "undefined" &&
+      $workflow.context &&
+      $workflow.context.target_company
+    ) {
+      targetCompany = $workflow.context.target_company;
+      companySource = "workflow_context";
+      console.log("✅ Found company from workflow context:", targetCompany);
+    } else {
+      console.log("❌ Workflow context not available or empty");
+    }
+  } catch (e) {
+    console.log("❌ Could not access workflow context:", e.message);
+  }
+}
+
+// Method 3: Extract from URL or domain patterns in citations
+if (targetCompany === "Unknown Company") {
+  console.log("🔍 Trying to extract from citation data...");
+
+  const domains = [];
+  for (const item of inputItems) {
+    const data = item.json || {};
+
+    // Check citation sources
+    if (data.source_url) domains.push(data.source_url);
+    if (data.enhanced_citations && Array.isArray(data.enhanced_citations)) {
+      data.enhanced_citations.forEach((citation) => {
+        if (citation.source_url) domains.push(citation.source_url);
+        if (citation.source_domain) domains.push(citation.source_domain);
+      });
+    }
+  }
+
+  // Look for company domains (you can expand this list)
+  const knownCompanyDomains = {
+    "wynnlasvegas.com": "Wynn Las Vegas",
+    "wynn.com": "Wynn Resorts",
+    "mgmresorts.com": "MGM Resorts",
+    "caesars.com": "Caesars Entertainment",
+    // Add more as needed
+  };
+
+  for (const url of domains) {
+    for (const [domain, company] of Object.entries(knownCompanyDomains)) {
+      if (url.includes(domain)) {
+        targetCompany = company;
+        companySource = "domain_analysis";
+        console.log(`✅ Found company from domain analysis: ${targetCompany}`);
+        break;
+      }
+    }
+    if (targetCompany !== "Unknown Company") break;
+  }
+}
+
+console.log(`🏢 Final company: ${targetCompany} (source: ${companySource})`);
+
+// Persist company to workflow context for downstream consistency
+try {
+  if (typeof $workflow !== "undefined") {
+    $workflow.context = $workflow.context || {};
+    $workflow.context.target_company = targetCompany;
+    console.log("✅ Stored company in workflow context:", targetCompany);
+  }
+} catch (e) {
+  console.log("⚠️ Could not store company in workflow context:", e.message);
+}
 
 // Quick summary of what we're getting
 let summary = {
@@ -23,6 +199,7 @@ let summary = {
   has_source_citations: 0,
   has_scraping_results: 0,
   has_research_results: 0,
+  has_company_data: 0,
   empty_inputs: 0,
   total_keys: 0,
 };
@@ -41,12 +218,14 @@ inputItems.forEach((item) => {
     if (data.source_citations) summary.has_source_citations++;
     if (data.scraping_results) summary.has_scraping_results++;
     if (data.research_results) summary.has_research_results++;
+    if (data.company || data.business_context) summary.has_company_data++;
   }
 });
 
 console.log("\n=== INPUT SUMMARY ===");
 console.log("Total inputs:", inputItems.length);
 console.log("Empty inputs:", summary.empty_inputs);
+console.log("Inputs with company data:", summary.has_company_data);
 console.log("Inputs with scenario_rankings:", summary.has_scenario_rankings);
 console.log("Inputs with scenarios:", summary.has_scenarios);
 console.log("Inputs with enhanced_citations:", summary.has_enhanced_citations);
@@ -54,51 +233,6 @@ console.log("Inputs with source_citations:", summary.has_source_citations);
 console.log("Inputs with scraping_results:", summary.has_scraping_results);
 console.log("Inputs with research_results:", summary.has_research_results);
 console.log("Total keys across all inputs:", summary.total_keys);
-
-// Debug each input - but limit to first 5 to avoid spam
-inputItems.slice(0, 5).forEach((item, index) => {
-  const data = item.json || {};
-  console.log(`\n--- Input ${index} Analysis ---`);
-  console.log("Keys:", Object.keys(data));
-  console.log("Has scenario_rankings:", !!data.scenario_rankings);
-  console.log("Has scenarios:", !!data.scenarios);
-  console.log("Has enhanced_citations:", !!data.enhanced_citations);
-  console.log("Has scraping_results:", !!data.scraping_results);
-  console.log("Has research_results:", !!data.research_results);
-  console.log("Has source_citations:", !!data.source_citations);
-
-  // Show actual data structure for first few inputs
-  if (index < 3) {
-    console.log("Full data structure:", JSON.stringify(data, null, 2));
-  }
-
-  if (data.scenario_rankings) {
-    console.log(`Scenario rankings count: ${data.scenario_rankings.length}`);
-    data.scenario_rankings.forEach((scenario, i) => {
-      console.log(
-        `  Scenario ${i + 1}: ${scenario.scenario_id} - ${
-          scenario.scenario_title
-        }`
-      );
-      console.log(
-        `    Competitors: ${scenario.competitors_ranked?.length || 0}`
-      );
-      console.log(
-        `    Analysis details: ${
-          Object.keys(scenario.analysis_details || {}).length
-        }`
-      );
-    });
-  }
-
-  if (data.enhanced_citations) {
-    console.log(`Enhanced citations count: ${data.enhanced_citations.length}`);
-  }
-
-  if (data.scraping_results) {
-    console.log(`Scraping results count: ${data.scraping_results.length}`);
-  }
-});
 
 // Initialize merged data structure
 let mergedData = {
@@ -114,7 +248,8 @@ let mergedData = {
 
   // Metadata
   report_metadata: {
-    company: "Unknown Company",
+    company: targetCompany,
+    company_source: companySource,
     total_scenarios: 0,
     competitors_analyzed: [],
   },
@@ -123,46 +258,11 @@ let mergedData = {
   merge_metadata: {
     merge_timestamp: new Date().toISOString(),
     input_count: inputItems.length,
-    processing_version: "2.0_enhanced",
+    processing_version: "2.1_fixed",
   },
 };
 
-// Process each input item - but first let's see what we actually have
-console.log("\n=== ANALYZING INPUTS ===");
-
-// Let's look at the actual structure of inputs
-let inputAnalysis = {
-  total: inputItems.length,
-  withData: 0,
-  empty: 0,
-  sampleKeys: new Set(),
-  sampleData: [],
-};
-
-inputItems.forEach((item, index) => {
-  const data = item.json || {};
-  const keys = Object.keys(data);
-
-  if (keys.length > 0) {
-    inputAnalysis.withData++;
-    keys.forEach((key) => inputAnalysis.sampleKeys.add(key));
-
-    // Capture sample data from first few non-empty inputs
-    if (inputAnalysis.sampleData.length < 3) {
-      inputAnalysis.sampleData.push({
-        index,
-        keys: keys,
-        sampleData: JSON.stringify(data, null, 2).substring(0, 500) + "...",
-      });
-    }
-  } else {
-    inputAnalysis.empty++;
-  }
-});
-
-console.log("Input Analysis:", JSON.stringify(inputAnalysis, null, 2));
-
-// Process each input item - handle individual citation objects
+// Process each input item
 inputItems.forEach((item, index) => {
   const data = item.json || {};
   console.log(`\n--- Processing Input ${index} ---`);
@@ -170,22 +270,6 @@ inputItems.forEach((item, index) => {
   // Check if this is a scenario data object
   if (data.scenario_rankings && Array.isArray(data.scenario_rankings)) {
     console.log(`Found ${data.scenario_rankings.length} scenario rankings`);
-
-    // Debug: Check competitor counts in each scenario
-    data.scenario_rankings.forEach((scenario, idx) => {
-      const competitorCount = scenario.competitors_ranked?.length || 0;
-      console.log(
-        `  Scenario ${scenario.scenario_id}: ${competitorCount} competitors`
-      );
-      if (competitorCount > 0) {
-        scenario.competitors_ranked.forEach((comp, compIdx) => {
-          console.log(
-            `    ${compIdx + 1}. ${comp.company}: ${comp.score || "N/A"}`
-          );
-        });
-      }
-    });
-
     mergedData.scenario_rankings = mergedData.scenario_rankings.concat(
       data.scenario_rankings
     );
@@ -233,26 +317,20 @@ inputItems.forEach((item, index) => {
     mergedData.enhanced_citations.push(data);
   }
 
-  // Handle metadata
-  if (data.company && data.company !== "Unknown Company") {
-    mergedData.report_metadata.company = data.company;
+  // Preserve business context and other metadata
+  if (data.business_context) {
+    mergedData.business_context = data.business_context;
+    console.log("Found business context data");
   }
 
-  if (data.report_metadata) {
-    if (
-      data.report_metadata.company &&
-      data.report_metadata.company !== "Unknown Company"
-    ) {
-      mergedData.report_metadata.company = data.report_metadata.company;
-    }
-    if (data.report_metadata.total_scenarios) {
-      mergedData.report_metadata.total_scenarios =
-        data.report_metadata.total_scenarios;
-    }
-    if (data.report_metadata.competitors_analyzed) {
-      mergedData.report_metadata.competitors_analyzed =
-        data.report_metadata.competitors_analyzed;
-    }
+  if (data.whitelist) {
+    mergedData.whitelist = data.whitelist;
+    console.log(`Found whitelist with ${data.whitelist.length} entries`);
+  }
+
+  if (data.competitors) {
+    mergedData.competitors = data.competitors;
+    console.log(`Found ${data.competitors.length} competitors`);
   }
 });
 
@@ -284,6 +362,31 @@ mergedData.scenario_rankings.forEach((scenario, index) => {
       Object.keys(scenario.analysis_details || {}).length
     })`
   );
+
+  // Process sources from scenario data
+  if (scenario.sources && scenario.sources.length > 0) {
+    console.log(
+      `  📚 Found ${scenario.sources.length} sources in scenario data`
+    );
+
+    // Add sources to the data_sources_table
+    if (!mergedData.data_sources_table) {
+      mergedData.data_sources_table = [];
+    }
+
+    // Add unique sources to the table
+    scenario.sources.forEach((source) => {
+      if (!mergedData.data_sources_table.includes(source)) {
+        mergedData.data_sources_table.push(source);
+      }
+    });
+
+    console.log(
+      `  ✅ Added sources to data_sources_table. Total: ${mergedData.data_sources_table.length}`
+    );
+  } else {
+    console.log(`  ⚠️  No sources found in scenario ${scenario.scenario_id}`);
+  }
 
   // If no competitors but has analysis_details, build competitors from analysis_details
   if (!hasCompetitors && hasAnalysisDetails) {
@@ -448,67 +551,6 @@ console.log(
   `✅ Enhanced and deduplicated citations: ${uniqueCitations.length}`
 );
 
-// Extract company name from scenario data
-console.log("\n=== EXTRACTING COMPANY NAME ===");
-if (mergedData.scenario_rankings.length > 0) {
-  // Look for the most frequently mentioned company in top positions
-  const companyMentions = {};
-
-  mergedData.scenario_rankings.forEach((scenario) => {
-    if (
-      scenario.competitors_ranked &&
-      Array.isArray(scenario.competitors_ranked)
-    ) {
-      scenario.competitors_ranked.forEach((comp, index) => {
-        if (comp.company && comp.company !== "Unknown Company") {
-          if (!companyMentions[comp.company]) {
-            companyMentions[comp.company] = {
-              count: 0,
-              totalScore: 0,
-              positions: [],
-            };
-          }
-          companyMentions[comp.company].count++;
-          companyMentions[comp.company].totalScore += comp.score || 0;
-          companyMentions[comp.company].positions.push(index + 1);
-        }
-      });
-    }
-  });
-
-  // Find the company with the most mentions and highest average score
-  let bestCompany = null;
-  let bestScore = 0;
-
-  Object.keys(companyMentions).forEach((company) => {
-    const mentions = companyMentions[company];
-    const avgScore = mentions.totalScore / mentions.count;
-    const avgPosition =
-      mentions.positions.reduce((sum, pos) => sum + pos, 0) /
-      mentions.positions.length;
-
-    // Score based on mentions, average score, and position (lower position is better)
-    const companyScore = mentions.count * 2 + avgScore - avgPosition * 0.5;
-
-    if (companyScore > bestScore) {
-      bestScore = companyScore;
-      bestCompany = company;
-    }
-  });
-
-  if (bestCompany) {
-    mergedData.report_metadata.company = bestCompany;
-    console.log(
-      `✅ Extracted company name: ${bestCompany} (mentions: ${
-        companyMentions[bestCompany].count
-      }, avg score: ${(
-        companyMentions[bestCompany].totalScore /
-        companyMentions[bestCompany].count
-      ).toFixed(1)})`
-    );
-  }
-}
-
 // Update final metadata
 mergedData.report_metadata.total_scenarios =
   mergedData.scenario_rankings.length;
@@ -520,18 +562,11 @@ mergedData.report_metadata.competitors_analyzed = [
   ),
 ];
 
-// Add input analysis to the output for debugging
-mergedData.input_analysis = {
-  total_inputs: inputItems.length,
-  inputs_with_data: inputAnalysis.withData,
-  empty_inputs: inputAnalysis.empty,
-  unique_keys_found: Array.from(inputAnalysis.sampleKeys),
-  sample_inputs: inputAnalysis.sampleData,
-};
-
 // Final summary
 console.log("\n=== FINAL MERGED DATA SUMMARY ===");
-console.log(`Company: ${mergedData.report_metadata.company}`);
+console.log(
+  `Company: ${mergedData.report_metadata.company} (${companySource})`
+);
 console.log(`Total scenarios: ${mergedData.scenario_rankings.length}`);
 console.log(
   `Total enhanced citations: ${mergedData.enhanced_citations.length}`
@@ -546,20 +581,20 @@ mergedData.scenario_rankings.forEach((scenario, index) => {
   console.log(`Scenario ${scenario.scenario_id}: ${scenario.scenario_title}`);
   console.log(`  Competitors: ${scenario.competitors_ranked?.length || 0}`);
   console.log(`  Key findings: ${scenario.key_findings?.length || 0}`);
-  if (scenario.competitors_ranked && scenario.competitors_ranked.length > 0) {
-    scenario.competitors_ranked.forEach((comp, idx) => {
-      console.log(`    ${idx + 1}. ${comp.company}: ${comp.score || "N/A"}`);
-    });
-  }
 });
 
-// Debug citation details
-console.log("\n=== CITATION DETAILS ===");
-console.log(`Sample citations (first 3):`);
-mergedData.enhanced_citations.slice(0, 3).forEach((citation, index) => {
-  console.log(`  ${index + 1}. ${citation.claim_text?.substring(0, 50)}...`);
-  console.log(`     Source: ${citation.source_url || "No URL"}`);
-  console.log(`     Authority: ${citation.authority_score}/10`);
-});
+// DEBUG: Show what we're outputting
+console.log("\n=== FINAL OUTPUT DEBUG ===");
+console.log("Company:", mergedData.report_metadata.company);
+console.log("Scenario rankings:", mergedData.scenario_rankings.length);
+console.log("Scenarios:", mergedData.scenarios.length);
+console.log("Enhanced citations:", mergedData.enhanced_citations.length);
+console.log("Source citations:", mergedData.source_citations.length);
+console.log("Scraping results:", mergedData.scraping_results.length);
+console.log("Research results:", mergedData.research_results.length);
+console.log(
+  "Total scenarios in metadata:",
+  mergedData.report_metadata.total_scenarios
+);
 
 return [{ json: mergedData }];

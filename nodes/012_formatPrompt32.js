@@ -235,11 +235,33 @@ function collectUrlsFromText(text) {
 // 3) Main pipeline
 const results = [];
 
+// Try to get company name from workflow execution context
+let company = null;
+try {
+  if (typeof $workflow !== "undefined" && $workflow.execution) {
+    const execution = $workflow.execution;
+    if (execution.data && execution.data.nodes) {
+      const parseGroupData = execution.data.nodes["003_parseGroupData"];
+      if (
+        parseGroupData &&
+        parseGroupData.output &&
+        parseGroupData.output.company
+      ) {
+        company = parseGroupData.output.company;
+        console.log("Found company from workflow execution:", company);
+      }
+    }
+  }
+} catch (e) {
+  console.log("Could not access workflow execution:", e.message);
+}
+
 console.log(
   "=== FORMAT PROMPT 32 DEBUG (UPDATED ALLOWLIST - ALLOW ALL DOMAINS) ==="
 );
 console.log("Input items:", $input.all().length);
 console.log("Explicit allowlist size:", EXPLICIT_ALLOWLIST.size);
+console.log("Company from workflow:", company);
 console.log(
   "Note: All domains are now allowed, explicit allowlist maintained for reference"
 );
@@ -324,9 +346,35 @@ for (let i = 0; i < $input.all().length; i++) {
     allowed_urls = dedupe(allowed_urls);
     blocked_urls = dedupe(blocked_urls);
 
+    // Try to preserve original scenario data from the input
+    let originalScenario = {};
+    try {
+      // Look for original scenario data in the input item
+      if (item.json?.scenario_id) {
+        originalScenario = {
+          scenario_id: item.json.scenario_id,
+          scenario_title: item.json.scenario_title,
+          user_query: item.json.user_query,
+          dimension: item.json.dimension,
+          rationale: item.json.rationale,
+          expected_metrics: item.json.expected_metrics,
+          data_limitations: item.json.data_limitations,
+          confidence_score: item.json.confidence_score,
+        };
+        console.log(
+          `✅ Preserved original scenario data for scenario ${originalScenario.scenario_id}: ${originalScenario.scenario_title}`
+        );
+      }
+    } catch (e) {
+      console.log(
+        `⚠️ Could not preserve original scenario data for item ${i}: ${e.message}`
+      );
+    }
+
     results.push({
-      scenario_id: i + 1,
-      scenario_title: `Scenario ${i + 1}`,
+      // Preserve original scenario data
+      ...originalScenario,
+      // Add processing results
       response_text: responseText, // JSON string if parseable & processed; otherwise the original text
       tokens_used: tokens,
       model: model,
@@ -340,9 +388,35 @@ for (let i = 0; i < $input.all().length; i++) {
     });
   } catch (error) {
     console.error(`Error processing item ${i}:`, error.message);
+
+    // Try to preserve original scenario data even in error case
+    let originalScenario = {};
+    try {
+      if (item.json?.scenario_id) {
+        originalScenario = {
+          scenario_id: item.json.scenario_id,
+          scenario_title: item.json.scenario_title,
+          user_query: item.json.user_query,
+          dimension: item.json.dimension,
+          rationale: item.json.rationale,
+          expected_metrics: item.json.expected_metrics,
+          data_limitations: item.json.data_limitations,
+          confidence_score: item.json.confidence_score,
+        };
+        console.log(
+          `✅ Preserved original scenario data in error case for scenario ${originalScenario.scenario_id}: ${originalScenario.scenario_title}`
+        );
+      }
+    } catch (e) {
+      console.log(
+        `⚠️ Could not preserve original scenario data in error case for item ${i}: ${e.message}`
+      );
+    }
+
     results.push({
-      scenario_id: i + 1,
-      scenario_title: `Scenario ${i + 1}`,
+      // Preserve original scenario data
+      ...originalScenario,
+      // Add error information
       response_text: `Error processing response: ${error.message}`,
       tokens_used: 0,
       model: "error",
@@ -361,4 +435,12 @@ console.log("Results created:", results.length);
 console.log("Policy: All domains are now allowed");
 console.log("Explicit allowlist maintained for reference and tracking");
 
-return [{ json: { scenarios_completed: results.length, results } }];
+return [
+  {
+    json: {
+      scenarios_completed: results.length,
+      results,
+      ...(company ? { company } : {}),
+    },
+  },
+];

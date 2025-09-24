@@ -26,6 +26,8 @@ const ORIGINS = new Set([
   "training_data",
   "real_time_search",
   "hybrid",
+  "web_research",
+  "company_filing",
   "unknown",
 ]);
 
@@ -199,6 +201,179 @@ const company =
     }
     return null;
   })() ||
+  // Extract from form data or workflow context
+  (() => {
+    // Look for company name from form input or workflow context
+    for (const item of items) {
+      // Check for company name in various form/input structures
+      if (item.company_name) return item.company_name;
+      if (item.company) return item.company;
+      if (item.target_company) return item.target_company;
+      if (item.form_data && item.form_data.company_name)
+        return item.form_data.company_name;
+      if (item.form_data && item.form_data.company)
+        return item.form_data.company;
+      if (item.workflow_data && item.workflow_data.company_name)
+        return item.workflow_data.company_name;
+      if (item.workflow_data && item.workflow_data.company)
+        return item.workflow_data.company;
+
+      // Check for company in metadata
+      if (item.metadata && item.metadata.company_name)
+        return item.metadata.company_name;
+      if (item.metadata && item.metadata.company) return item.metadata.company;
+
+      // Check for company in processing metadata
+      if (item.processing_metadata && item.processing_metadata.company_name)
+        return item.processing_metadata.company_name;
+      if (item.processing_metadata && item.processing_metadata.company)
+        return item.processing_metadata.company;
+
+      // Check for form trigger data structure
+      if (item.form_data && item.form_data.values) {
+        const companyField = item.form_data.values.find(
+          (field) =>
+            field.fieldLabel === "Company Name" ||
+            field.name === "company_name" ||
+            field.key === "company_name"
+        );
+        if (companyField && companyField.value) return companyField.value;
+      }
+
+      // Check for direct form values
+      if (item.form_values && item.form_values.company_name)
+        return item.form_values.company_name;
+      if (item.form_values && item.form_values.company)
+        return item.form_values.company;
+    }
+    return null;
+  })() ||
+  // Try to get from workflow execution context
+  (() => {
+    try {
+      // Check if we can access workflow execution data
+      if (typeof $workflow !== "undefined" && $workflow.execution) {
+        const execution = $workflow.execution;
+        if (execution.data && execution.data.form_data) {
+          const formData = execution.data.form_data;
+          if (formData.company_name) return formData.company_name;
+          if (formData.company) return formData.company;
+        }
+      }
+    } catch (e) {
+      console.log("Could not access workflow context:", e.message);
+    }
+    return null;
+  })() ||
+  // Try to get from workflow execution data (look for parse group data results)
+  (() => {
+    try {
+      // Check if we can access the results from 003_parseGroupData
+      if (typeof $workflow !== "undefined" && $workflow.execution) {
+        const execution = $workflow.execution;
+        // Look for data from the parse group data node
+        if (execution.data && execution.data.nodes) {
+          const parseGroupData = execution.data.nodes["003_parseGroupData"];
+          if (parseGroupData && parseGroupData.output) {
+            const output = parseGroupData.output;
+            if (output.company) {
+              console.log(
+                "Found company from workflow execution parse group data:",
+                output.company
+              );
+              return output.company;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.log(
+        "Could not access workflow execution parse group data:",
+        e.message
+      );
+    }
+    return null;
+  })() ||
+  // Try to get from Parse & Group Data node output (company field)
+  (() => {
+    try {
+      // Look for company data that might have been passed through from 003_parseGroupData
+      for (const item of items) {
+        // Check if this item has company data from the parse step
+        if (
+          item.company &&
+          typeof item.company === "string" &&
+          item.company.trim()
+        ) {
+          console.log("Found company from parse group data:", item.company);
+          return item.company.trim();
+        }
+        // Check for company in any nested data structures
+        if (item.parsed_data && item.parsed_data.company) {
+          console.log(
+            "Found company in parsed_data:",
+            item.parsed_data.company
+          );
+          return item.parsed_data.company;
+        }
+        if (item.business_context && item.business_context.company) {
+          console.log(
+            "Found company in business_context:",
+            item.business_context.company
+          );
+          return item.business_context.company;
+        }
+        // Check for company in whitelist (first item is usually the target company)
+        if (
+          item.whitelist &&
+          Array.isArray(item.whitelist) &&
+          item.whitelist.length > 0
+        ) {
+          console.log("Found company in whitelist:", item.whitelist[0]);
+          return item.whitelist[0];
+        }
+      }
+    } catch (e) {
+      console.log("Could not access parse group data:", e.message);
+    }
+    return null;
+  })() ||
+  // Try to extract company name from citation data (look for company mentions)
+  (() => {
+    try {
+      // Look through citations for company mentions
+      for (const item of items) {
+        if (item.enhanced_citations && Array.isArray(item.enhanced_citations)) {
+          // Look for citations that mention specific companies
+          const companyMentions = item.enhanced_citations
+            .map((c) => c.claim_text)
+            .filter((text) => text && typeof text === "string")
+            .join(" ")
+            .toLowerCase();
+
+          // Check for common company patterns (generic approach)
+          // Extract first capitalized company name found in citations
+          const companyNameMatch = companyMentions.match(
+            /\b[A-Z][a-zA-Z\s&]+(?:Inc|Corp|Company|LLC|Ltd|Group|Systems|Solutions|Technologies|Services|Enterprises)\b/
+          );
+          if (companyNameMatch) {
+            return companyNameMatch[0];
+          }
+
+          // Fallback: look for any capitalized multi-word company names
+          const genericCompanyMatch = companyMentions.match(
+            /\b[A-Z][a-zA-Z\s&]{2,}\b/
+          );
+          if (genericCompanyMatch) {
+            return genericCompanyMatch[0];
+          }
+        }
+      }
+    } catch (e) {
+      console.log("Could not extract company from citations:", e.message);
+    }
+    return null;
+  })() ||
   "Unknown Company";
 
 console.log("Company determination debug:");
@@ -217,7 +392,17 @@ items.forEach((item, index) => {
     hasTargetCompany: !!item.target_company,
     hasScenarios: !!item.scenarios,
     hasScenarioRankings: !!item.scenario_rankings,
+    hasFormData: !!item.form_data,
+    hasFormValues: !!item.form_values,
+    hasWorkflowData: !!item.workflow_data,
+    hasMetadata: !!item.metadata,
+    hasProcessingMetadata: !!item.processing_metadata,
   });
+
+  // Log the actual structure of the first item for debugging
+  if (index === 0) {
+    console.log("  First item full structure:", JSON.stringify(item, null, 2));
+  }
 });
 console.log("Final company determined:", company);
 

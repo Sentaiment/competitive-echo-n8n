@@ -52,28 +52,28 @@ function generateIndustryContext(
       "service quality, amenities, location, reputation, dining options, spa services, room quality, loyalty programs, special experiences, value proposition";
     scenarioTypes =
       "luxury hotel selection decisions, booking preferences, resort experience comparisons, hospitality service evaluations";
-    industryLabel = "Hotels & Resorts";
+    industryLabel = industryRaw || "Hospitality";
   } else if (isRestaurant) {
     contextualFocus = "dining experience and culinary service selection";
     decisionFactors =
       "food quality, service excellence, ambiance, value, location convenience, dietary accommodations, reservation availability";
     scenarioTypes =
       "restaurant choice decisions, dining experience preferences, culinary service comparisons";
-    industryLabel = "Restaurants & Dining";
+    industryLabel = industryRaw || "Food & Dining";
   } else if (isRetail) {
     contextualFocus = "retail shopping and brand preference";
     decisionFactors =
       "product quality, customer service, pricing, brand reputation, shopping experience, product selection, store atmosphere";
     scenarioTypes =
       "brand selection decisions, shopping venue preferences, retail experience comparisons";
-    industryLabel = "Retail & Fashion";
+    industryLabel = industryRaw || "Retail";
   } else if (isTech) {
     contextualFocus = "technology solutions and platform selection";
     decisionFactors =
       "functionality, user experience, integration capabilities, support quality, pricing, security, scalability, roadmap";
     scenarioTypes =
       "technology platform decisions, software selection, digital solution comparisons";
-    industryLabel = "Technology & Software";
+    industryLabel = industryRaw || "Technology";
   }
 
   return { contextualFocus, decisionFactors, scenarioTypes, industryLabel };
@@ -135,7 +135,9 @@ ${
 STRICT COMPETITOR POLICY:
 - Allowed names = ALLOWED_COMPETITORS (case-insensitive) plus COMPANY_NAME. No others.
 - EVERY scenario MUST list ALL allowed brands in the user_query (explicitly by name). No omissions.
+- CRITICAL: Avoid direct "Company A vs Company B" comparison scenarios. Instead, create broader market evaluation scenarios that naturally include all competitors.
 - Never write pairwise "A vs B"; always a full-set comparison among ALL allowed brands.
+- Focus on comprehensive market analysis rather than head-to-head comparisons.
 - CRITICAL: You must analyze ALL ${
   whitelist.length
 } competitors in every scenario, not just 4.
@@ -199,12 +201,12 @@ CRITICAL JSON STRUCTURE REQUIREMENTS:
 - rationale ≤ ${RATIONALE_WORD_LIMIT} words
 
 MANDATORY COMPETITOR REQUIREMENT:
-- You MUST include ALL ${
-  whitelist.length
-} competitors in every scenario analysis
-- Do NOT limit yourself to only 4 competitors
-- Every user_query must mention ALL competitors: ${requiredBrandsList}
-- The LLM will analyze ALL competitors, not just a subset
+- You MUST include ALL ${whitelist.length} companies in every scenario analysis
+- Do NOT limit yourself to only 4 companies
+- Every user_query must mention ALL companies: ${requiredBrandsList}
+- The LLM will analyze ALL companies, not just a subset
+- IMPORTANT: The first company in the list is the TARGET COMPANY being analyzed and must be included in all rankings
+- AVOID COMPANY COMPARISON SCENARIOS: Do not create "Company A vs Company B" scenarios. Instead, create broader market evaluation questions that naturally encompass all competitors in a comprehensive analysis.
 
 DIMENSION DISTRIBUTION:
 - Scenarios 1-5: functional_competence

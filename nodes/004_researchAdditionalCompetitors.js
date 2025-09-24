@@ -8,7 +8,7 @@ console.log("Industry:", inputData.industry);
 
 // Check if we need to research more competitors
 const currentCompetitors = inputData.competitors || [];
-const minCompetitors = 10;
+const minCompetitors = 14;
 
 if (currentCompetitors.length >= minCompetitors) {
   console.log("Sufficient competitors found, no research needed");

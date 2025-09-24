@@ -13,15 +13,37 @@ console.log(
   `Processing ${sourceExtractionPrompts.length} source research requests`
 );
 
+// Debug: Check the structure of the first few prompts
+if (sourceExtractionPrompts.length > 0) {
+  console.log(
+    "First prompt structure:",
+    JSON.stringify(sourceExtractionPrompts[0], null, 2)
+  );
+  console.log(
+    "Has scenarios_used:",
+    !!sourceExtractionPrompts[0].scenarios_used
+  );
+  console.log(
+    "scenarios_used type:",
+    typeof sourceExtractionPrompts[0].scenarios_used
+  );
+  console.log(
+    "scenarios_used value:",
+    sourceExtractionPrompts[0].scenarios_used
+  );
+}
+
 // Process each source extraction prompt
 const sourceResearchResults = sourceExtractionPrompts.map((prompt, index) => {
-  console.log(`Processing source ${index + 1}: ${prompt.source_name}`);
+  console.log(
+    `Processing source ${index + 1}: ${prompt.source_name || "Unknown"}`
+  );
 
   // Create research request following Sentaiment PRD schema
   const researchRequest = {
-    source_id: prompt.source_id,
-    source_name: prompt.source_name,
-    scenarios_used: prompt.scenarios_used,
+    source_id: prompt.source_id || `source_${index}`,
+    source_name: prompt.source_name || `Source ${index + 1}`,
+    scenarios_used: prompt.scenarios_used || [],
     research_prompt: {
       system_content: `You are a source research specialist implementing the Sentaiment PRD v2.0 source citation system. Research the given source and extract comprehensive metadata with strict adherence to the JSON schema.
 
@@ -33,18 +55,20 @@ CORE REQUIREMENTS:
 - Calculate influence weights and bias indicators
 - Extract supporting evidence and cross-references
 
-RETURN ONLY VALID JSON matching the source_citation schema.`,
+RETURN ONLY VALID JSON matching the source_citation schema. Do not include markdown or code fences.`,
 
       user_content: `RESEARCH SOURCE METADATA
 
 Source: ${prompt.source_name}
-Context: Used in competitive analysis scenarios ${prompt.scenarios_used.join(
-        ", "
-      )}
+Context: Used in competitive analysis scenarios ${(
+        prompt.scenarios_used || []
+      ).join(", ")}
 
 RESEARCH TASKS:
 1. Find the specific URL for this source
 2. Extract exact publication date (YYYY-MM-DD format)
+   - Preserve original publication year if present in the source name/title
+   - If no date is available, return null (do not synthesize)
 3. Identify author(s) or organization
 4. Determine authority score (1-10) based on:
    - Source credibility and reputation
@@ -104,7 +128,7 @@ RETURN JSON FORMAT:
       "actionability_score": 8,
       "geographic_scope": "global|regional|local",
       "time_sensitivity": "immediate|quarterly|annual",
-      "tags": ["competitive_analysis", "luxury_hospitality", "service_quality"]
+      "tags": ["competitive_analysis", "market_research", "business_analysis"]
     }
   ],
   "extraction_metadata": {
@@ -113,11 +137,11 @@ RETURN JSON FORMAT:
     "source_diversity_score": 7,
     "recency_score": 6,
     "deduplication_applied": true,
-    "extraction_timestamp": "${new Date().toISOString()}"
+    "research_timestamp": "${new Date().toISOString()}"
   }
 }
 
-Focus on finding the most accurate and comprehensive metadata for this specific source.`,
+Focus on finding the most accurate and comprehensive metadata for this specific source. Return ONLY valid JSON. Do not include markdown or code fences.`,
     },
   };
 

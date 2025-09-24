@@ -269,68 +269,51 @@ function generateEnhancedMetadata(url) {
     const domain = urlParts[1].toLowerCase();
     const path = urlParts[2].toLowerCase();
 
-    // Generate intelligent titles based on URL patterns
-    if (domain.includes("forbestravelguide.com")) {
-      metadata.title =
-        "Forbes Travel Guide Star Awards - Luxury Hospitality Recognition";
-      metadata.publisher = "Forbes Travel Guide";
-      metadata.content_type = "award_announcement";
-      metadata.description =
-        "Official Forbes Travel Guide Star Awards recognizing exceptional luxury hotels, restaurants, and spas worldwide";
-    } else if (domain.includes("vegasluxuryinsider.com")) {
-      metadata.title = "Las Vegas Luxury Hospitality Market Analysis";
-      metadata.publisher = "Vegas Luxury Insider";
-      metadata.content_type = "market_analysis";
-      metadata.description =
-        "Comprehensive analysis of luxury hospitality trends and market positioning in Las Vegas";
-    } else if (domain.includes("hospitalitytech.com")) {
-      metadata.title = "Hospitality Technology Innovation Report";
-      metadata.publisher = "Hospitality Technology";
+    // Generate intelligent titles based on URL patterns (generic approach)
+    if (domain.includes("forbes.com")) {
+      metadata.title = "Forbes Business Analysis and Market Intelligence";
+      metadata.publisher = "Forbes";
       metadata.content_type = "industry_report";
       metadata.description =
-        "Latest developments in hospitality technology and digital innovation";
-    } else if (
-      domain.includes("mgmresorts.com") ||
-      domain.includes("mgmgrand.com")
-    ) {
-      metadata.title = "MGM Resorts Luxury Hospitality Services";
-      metadata.publisher = "MGM Resorts International";
+        "Comprehensive business analysis and market intelligence from Forbes";
+    } else if (domain.includes("reuters.com")) {
+      metadata.title = "Reuters Business News and Analysis";
+      metadata.publisher = "Reuters";
+      metadata.content_type = "news_article";
+      metadata.description =
+        "Latest business news and market analysis from Reuters";
+    } else if (domain.includes("bloomberg.com")) {
+      metadata.title = "Bloomberg Market Intelligence and Analysis";
+      metadata.publisher = "Bloomberg";
+      metadata.content_type = "analyst_report";
+      metadata.description =
+        "Professional market intelligence and business analysis from Bloomberg";
+    } else if (domain.includes("wsj.com")) {
+      metadata.title = "Wall Street Journal Business Report";
+      metadata.publisher = "The Wall Street Journal";
+      metadata.content_type = "news_article";
+      metadata.description =
+        "Business news and market analysis from The Wall Street Journal";
+    } else if (domain.includes("techcrunch.com")) {
+      metadata.title = "TechCrunch Technology Market Analysis";
+      metadata.publisher = "TechCrunch";
+      metadata.content_type = "industry_report";
+      metadata.description =
+        "Technology industry news and market analysis from TechCrunch";
+    } else if (domain.includes(".gov")) {
+      metadata.title = "Government Business and Market Data";
+      metadata.publisher = "Government Source";
+      metadata.content_type = "government_source";
+      metadata.description =
+        "Official government business data and market information";
+    } else if (domain.includes("company") || domain.includes("corp")) {
+      metadata.title = "Corporate Business Information";
+      metadata.publisher = domain;
       metadata.content_type = "company_website";
-      metadata.description =
-        "Official MGM Resorts luxury hospitality and suite offerings";
-    } else if (domain.includes("hospitalitynet.org")) {
-      metadata.title = "Hospitality Industry News and Analysis";
-      metadata.publisher = "Hospitality Net";
-      metadata.content_type = "industry_news";
-      metadata.description =
-        "Latest news and insights from the global hospitality industry";
-    } else if (domain.includes("luxurytraveladvisor.com")) {
-      metadata.title = "Luxury Travel Advisory and Market Trends";
-      metadata.publisher = "Luxury Travel Advisor";
-      metadata.content_type = "travel_advisor";
-      metadata.description =
-        "Expert insights on luxury travel trends and hospitality excellence";
-    } else if (domain.includes("wynnlasvegas.com")) {
-      metadata.title = "Wynn Las Vegas Luxury Resort and Casino";
-      metadata.publisher = "Wynn Las Vegas";
-      metadata.content_type = "company_website";
-      metadata.description =
-        "Official Wynn Las Vegas luxury resort, casino, and entertainment offerings";
-    } else if (domain.includes("venetianlasvegas.com")) {
-      metadata.title = "The Venetian Las Vegas Resort and Casino";
-      metadata.publisher = "The Venetian Las Vegas";
-      metadata.content_type = "company_website";
-      metadata.description =
-        "Official Venetian Las Vegas luxury resort, casino, and suite accommodations";
-    } else if (domain.includes("fontainebleaulasvegas.com")) {
-      metadata.title = "Fontainebleau Las Vegas Luxury Resort";
-      metadata.publisher = "Fontainebleau Las Vegas";
-      metadata.content_type = "company_website";
-      metadata.description =
-        "Official Fontainebleau Las Vegas luxury resort and hospitality services";
+      metadata.description = "Official corporate information and business data";
     } else {
       // Generic fallback
-      metadata.title = `Luxury Hospitality Analysis - ${domain}`;
+      metadata.title = `Business Analysis - ${domain}`;
       metadata.publisher = domain;
       metadata.content_type = "web_research";
       metadata.description = `Competitive analysis and market intelligence from ${domain}`;
@@ -351,15 +334,17 @@ function generateEnhancedMetadata(url) {
     // Generate publication date (use current date for real-time analysis)
     metadata.publication_date = new Date().toISOString().split("T")[0];
 
-    // Enhance description based on path patterns
+    // Enhance description based on path patterns (generic approach)
     if (path.includes("award") || path.includes("winner")) {
       metadata.description += " - Award recognition and excellence standards";
-    } else if (path.includes("suite") || path.includes("room")) {
-      metadata.description += " - Luxury accommodations and suite offerings";
-    } else if (path.includes("dining") || path.includes("restaurant")) {
-      metadata.description += " - Culinary excellence and dining experiences";
-    } else if (path.includes("spa") || path.includes("wellness")) {
-      metadata.description += " - Spa services and wellness offerings";
+    } else if (path.includes("product") || path.includes("service")) {
+      metadata.description += " - Product and service offerings";
+    } else if (path.includes("market") || path.includes("analysis")) {
+      metadata.description += " - Market analysis and business intelligence";
+    } else if (path.includes("financial") || path.includes("earnings")) {
+      metadata.description += " - Financial data and business performance";
+    } else if (path.includes("news") || path.includes("press")) {
+      metadata.description += " - News and press releases";
     }
   } catch (error) {
     console.error(`Error generating metadata for ${url}:`, error.message);
@@ -471,24 +456,28 @@ function calculateRealAuthorityScore(url, metadata) {
     domain.includes("forbes.com") ||
     domain.includes("reuters.com") ||
     domain.includes("bloomberg.com") ||
-    domain.includes("wsj.com")
+    domain.includes("wsj.com") ||
+    domain.includes("ft.com") ||
+    domain.includes("cnbc.com")
   ) {
     score += 3;
   }
   // Medium authority domains
   else if (
-    domain.includes("hospitalitytech.com") ||
-    domain.includes("hospitalitynet.org") ||
-    domain.includes("luxurytraveladvisor.com")
+    domain.includes("techcrunch.com") ||
+    domain.includes("venturebeat.com") ||
+    domain.includes("hbr.org") ||
+    domain.includes("mckinsey.com") ||
+    domain.includes("deloitte.com")
   ) {
     score += 2;
   }
   // Company domains
   else if (
-    domain.includes("wynnlasvegas.com") ||
-    domain.includes("mgmresorts.com") ||
-    domain.includes("venetianlasvegas.com") ||
-    domain.includes("fontainebleaulasvegas.com")
+    domain.includes("company") ||
+    domain.includes("corp") ||
+    domain.includes("inc") ||
+    domain.includes("llc")
   ) {
     score += 1;
   }
