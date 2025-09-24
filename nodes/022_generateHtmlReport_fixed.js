@@ -287,6 +287,10 @@ const html = `<!doctype html>
   .metrics-cell{max-width:250px}
   .metrics-grid{display:flex;flex-direction:column;gap:2px}
   .metric-item{font-size:11px;color:#374151;white-space:nowrap}
+  .target-company-row{background:#f0f9ff;border-left:4px solid #0ea5e9;position:relative}
+  .target-company-row:hover{background:#e0f2fe}
+  .target-company-badge{position:absolute;top:4px;right:8px;background:#0ea5e9;color:white;font-size:10px;padding:2px 6px;border-radius:4px;font-weight:600}
+  .target-company-cell{font-weight:600;color:#0c4a6e}
   @media (max-width:1000px){
     .kpiRow{grid-template-columns:repeat(2,minmax(0,1fr))}
     .grid2{grid-template-columns:1fr}
@@ -465,79 +469,161 @@ const html = `<!doctype html>
     console.log('REPORT data received:', REPORT);
     console.log('Scenarios count:', REPORT.scenarios?.length || 0);
     console.log('Company:', REPORT.report_metadata?.company);
-    console.log('First scenario:', REPORT.scenarios?.[0]);
 
     // Helper functions
     const $ = (sel, root=document) => root.querySelector(sel);
     function clear(el){ if(!el) return; while(el.firstChild) el.removeChild(el.firstChild); }
     function makeEl(tag, attrs={}, txt=null){ const el=document.createElement(tag); for(const[k,v] of Object.entries(attrs)) el.setAttribute(k,v); if(txt!=null) el.textContent=txt; return el; }
 
-    // Normalize company names to a base form for deduplication across scenarios
+    // Simple company name normalization
     function normCompanyBase(name){
-      const s = (name||'').toString().normalize('NFKC').toLowerCase().trim();
-      return s
-        .replace(/^the\s+/, '')
+      if (!name) return '';
+      return name.toString()
+        .normalize('NFKC')
+        .toLowerCase()
+        .trim()
+        .replace(/^the\\s+/, '')
         .replace(/&/g,'and')
-        .replace(/\b(hotels?|resorts?|casino|group|holdings?|inc\.?|llc|ltd\.?|co\.?|corp\.?|company)\b/g, '')
-        .replace(/[^a-z0-9\s]/g,'')
-        .replace(/\s+/g,' ')
+        .replace(/[^a-z0-9\\s]/g,'')
+        .replace(/\\s+/g,' ')
         .trim();
+    }
+
+    // Simple company grouping - no hardcoded names
+    function findCompanyGroup(companyName, existingGroups = new Map()){
+      const normalized = normCompanyBase(companyName);
+      
+      // Extract meaningful words (excluding common suffixes)
+      const meaningfulWords = normalized
+        .replace(/\\b(hotels?|resorts?|casino|group|holdings?|inc\\.?|llc|ltd\\.?|co\\.?|corp\\.?|company|strip|las vegas)\\b/g, '')
+        .trim()
+        .split(/\\s+/)
+        .filter(word => word.length > 2);
+      
+      if (meaningfulWords.length === 0) {
+        return normalized;
+      }
+      
+      // Look for existing groups that share meaningful words
+      for (const [groupKey, groupData] of existingGroups.entries()) {
+        const groupWords = groupData.meaningfulWords || [];
+        
+        // Check for common meaningful words
+        const commonWords = meaningfulWords.filter(word =>
+          groupWords.some(gWord => {
+            if (word === gWord) return true; // Exact match
+            // For longer words, allow substring match
+            if (word.length >= 4 && gWord.length >= 4) {
+              return word.includes(gWord) || gWord.includes(word);
+            }
+            return false;
+          })
+        );
+        
+        if (commonWords.length > 0) {
+          return groupKey;
+        }
+      }
+      
+      // If no suitable group found, create a new group key
+      return meaningfulWords.sort((a, b) => b.length - a.length)[0] || normalized;
     }
 
     function computeH2H(scenariosArr){
       console.log('computeH2H called with:', scenariosArr);
       const map = new Map();
+      const groupMap = new Map();
+      
       (scenariosArr||[]).forEach((sc, scIndex)=>{
         console.log('Processing scenario', scIndex, ':', sc.title);
         const tc = Array.isArray(sc.top_competitors) ? sc.top_competitors : [];
         console.log('Top competitors for scenario', scIndex, ':', tc.length);
         tc.forEach((row, idx)=>{
           const display = (row && row.company) ? row.company : 'Unknown';
-          const key = normCompanyBase(display);
-          console.log('Processing competitor:', display, 'key:', key, 'at position', idx+1);
-          if(!map.has(key)) map.set(key, {name: display, scenarios:0, wins:0, posTotal:0});
-          const r = map.get(key);
-          if (display.length < r.name.length) r.name = display;
-          r.scenarios += 1;
-          r.posTotal += (idx+1);
-          if(idx===0) r.wins += 1;
+          const normalizedDisplay = normCompanyBase(display);
+          
+          // Determine the group key for this company
+          const groupKey = findCompanyGroup(display, groupMap);
+          
+          // Initialize group data if new
+          if (!groupMap.has(groupKey)) {
+            groupMap.set(groupKey, {
+              name: display,
+              meaningfulWords: findCompanyGroup(display).split(/\\s+/).filter(word => word.length > 2),
+              allNames: new Set(),
+              scenarios: 0,
+              wins: 0,
+              posTotal: 0
+            });
+          }
+          const groupData = groupMap.get(groupKey);
+          
+          // Update the best display name
+          if (display.length < groupData.name.length) groupData.name = display;
+          groupData.allNames.add(display);
+          
+          groupData.scenarios += 1;
+          if (idx === 0) groupData.wins += 1;
+          groupData.posTotal += (idx + 1);
         });
       });
-      const arr = Array.from(map.values()).map(r=>({
-        name:r.name,
-        scenarios:r.scenarios,
-        wins:r.wins,
-        avgPos:r.posTotal/r.scenarios,
-        winRate:r.wins/r.scenarios
+      
+      // Convert map to array and calculate averages
+      const results = Array.from(groupMap.values()).map(r => ({
+        name: r.name,
+        allNames: Array.from(r.allNames).sort(),
+        scenarios: r.scenarios,
+        wins: r.wins,
+        avgPos: r.scenarios > 0 ? r.posTotal / r.scenarios : 0,
+        winRate: r.scenarios > 0 ? r.wins / r.scenarios : 0
       }));
-      arr.sort((a,b)=>{
-        if(b.wins!==a.wins) return b.wins-a.wins;
-        if(a.avgPos!==b.avgPos) return a.avgPos-b.avgPos;
-        return a.name.localeCompare(b.name);
-      });
-      return arr;
+      
+      return results.sort((a,b)=>b.winRate-a.winRate || a.avgPos-b.avgPos);
     }
 
     function renderH2H(){
-      const body = $('#h2h-table tbody'); clear(body);
+      const body = $('#h2h-table tbody'); 
+      clear(body);
       const h2h = computeH2H(REPORT.scenarios);
+      
+      // Get target company for highlighting
+      const targetRaw = (REPORT.report_metadata && REPORT.report_metadata.company) || '';
+      const targetGroupKey = findCompanyGroup(targetRaw);
+      
       h2h.forEach((r,i)=>{
         const tr = document.createElement('tr');
-        tr.innerHTML =
-          '<td class="rank">#'+(i+1)+'</td>'+
-          '<td>'+r.name+'</td>'+
-          '<td>'+r.wins+'</td>'+
-          '<td>'+r.scenarios+'</td>'+
-          '<td>'+r.avgPos.toFixed(2)+'</td>'+
-          '<td>'+Math.round(r.winRate*100)+'%</td>';
+        const isTargetCompany = findCompanyGroup(r.name) === targetGroupKey;
+        
+        if (isTargetCompany) {
+          tr.className = 'target-company-row';
+          const nameDisplay = r.name + (r.allNames && r.allNames.length > 1 ? 
+            \` <span style="font-size:11px;color:#6b7280;">(includes: \${r.allNames.slice(1).join(', ')}</span>\` : '');
+          tr.innerHTML =
+            '<td class="rank">#'+(i+1)+'</td>'+
+            '<td class="target-company-cell">'+nameDisplay+' <span class="target-company-badge">TARGET</span></td>'+
+            '<td>'+r.wins+'</td>'+
+            '<td>'+r.scenarios+'</td>'+
+            '<td>'+r.avgPos.toFixed(2)+'</td>'+
+            '<td>'+Math.round(r.winRate*100)+'%</td>';
+        } else {
+          const nameDisplay = r.name + (r.allNames && r.allNames.length > 1 ? 
+            \` <span style="font-size:11px;color:#6b7280;">(includes: \${r.allNames.slice(1).join(', ')}</span>\` : '');
+          tr.innerHTML =
+            '<td class="rank">#'+(i+1)+'</td>'+
+            '<td>'+nameDisplay+'</td>'+
+            '<td>'+r.wins+'</td>'+
+            '<td>'+r.scenarios+'</td>'+
+            '<td>'+r.avgPos.toFixed(2)+'</td>'+
+            '<td>'+Math.round(r.winRate*100)+'%</td>';
+        }
         body.appendChild(tr);
       });
 
       // KPIs for the target company
-      const norm = (s)=> (s||'').toString().normalize('NFKC').trim().toLowerCase().replace(/\s+/g,' ');
-      const stripThe = (s)=> s.replace(/^the\s+/,'');
-      const targetRaw = (REPORT.report_metadata && REPORT.report_metadata.company) || '';
-      const target = normCompanyBase(targetRaw) || norm(targetRaw);
+      const norm = (s)=> (s||'').toString().normalize('NFKC').trim().toLowerCase().replace(/\\s+/g,' ');
+      const stripThe = (s)=> s.replace(/^the\\s+/,'');
+      const targetRaw2 = (REPORT.report_metadata && REPORT.report_metadata.company) || '';
+      const target = normCompanyBase(targetRaw2) || norm(targetRaw2);
       console.log('Looking for target company:', target);
       console.log('Available companies in h2h:', h2h.map(h => h.name));
       let rec = h2h.find(x => normCompanyBase(x.name) === target)
@@ -545,7 +631,6 @@ const html = `<!doctype html>
         || h2h.find(x => stripThe(norm(x.name)) === stripThe(target))
         || h2h.find(x => stripThe(norm(x.name)).includes(stripThe(target)))
         || null;
-      // Fallback: use top-ranked company overall
       if (!rec && h2h.length > 0) rec = h2h[0];
       console.log('Found target company record:', rec);
       $('#kpi-winrate').textContent = rec ? (Math.round(rec.winRate*100)+'%') : '—';
@@ -553,7 +638,8 @@ const html = `<!doctype html>
     }
 
     function populateScenarioSelector(){
-      const sel = $('#scenario-select'); clear(sel);
+      const sel = $('#scenario-select'); 
+      clear(sel);
       (REPORT.scenarios||[]).forEach((sc, idx)=>{
         const label = sc.title || ('Scenario '+(idx+1));
         const opt = makeEl('option', { value:String(idx) }, label);
@@ -562,21 +648,25 @@ const html = `<!doctype html>
     }
 
     function renderScenario(idx){
-      const sc = (REPORT.scenarios||[])[idx]; if(!sc) return;
+      const sc = (REPORT.scenarios||[])[idx]; 
+      if(!sc) return;
       $('#sc-title').textContent = sc.title || ('Scenario '+(idx+1));
       $('#sc-id').textContent = 'ID ' + (sc.scenario_id!=null ? sc.scenario_id : '—');
 
-      // Remove any previously injected badges/chips for a cleaner layout
-      const titleSection = document.querySelector('#scenario-block > div:first-child');
-      if (titleSection) {
-        const existingEvidence = titleSection.querySelector('.evidence-quality');
-        if (existingEvidence) existingEvidence.remove();
-      }
-
       // Top competitors with detailed metrics
-      const tb = $('#sc-top-table tbody'); clear(tb);
+      const tb = $('#sc-top-table tbody'); 
+      clear(tb);
+      
+      // Get target company for highlighting
+      const targetRaw = (REPORT.report_metadata && REPORT.report_metadata.company) || '';
+      const targetGroupKey = findCompanyGroup(targetRaw);
+      
       (Array.isArray(sc.top_competitors)?sc.top_competitors:[]).forEach((row,i)=>{
         const tr = document.createElement('tr');
+        
+        // Check if this company matches the target using the same grouping logic
+        const companyName = row.company || '';
+        const isTargetCompany = findCompanyGroup(companyName) === targetGroupKey;
         
         // Create detailed metrics display
         let metricsHtml = '—';
@@ -588,9 +678,13 @@ const html = `<!doctype html>
           metricsHtml = '<div class="metrics-grid">' + metricsArray.join('') + '</div>';
         }
         
+        if (isTargetCompany) {
+          tr.className = 'target-company-row';
+        }
+        
         tr.innerHTML =
-          '<td class="rank">#'+(i+1)+'</td>'+
-          '<td>'+(row.company||'—')+'</td>'+
+          '<td class="rank">'+(i+1)+'</td>'+
+          '<td '+(isTargetCompany ? 'class="target-company-cell"' : '')+'>'+companyName+(isTargetCompany ? ' <span class="target-company-badge">TARGET</span>' : '')+'</td>'+
           '<td>'+(row.score!=null?row.score:'—')+'</td>'+
           '<td class="metrics-cell">'+metricsHtml+'</td>'+
           '<td>'+(row.rationale||'—')+'</td>';
@@ -598,22 +692,23 @@ const html = `<!doctype html>
       });
 
       // Key Findings
-      const kf = $('#sc-keyfindings'); clear(kf);
+      const kf = $('#sc-keyfindings'); 
+      clear(kf);
       (Array.isArray(sc.key_findings)?sc.key_findings:[]).forEach(k=>{
         kf.appendChild(makeEl('li', {}, k));
       });
 
-      // Scenario Sources (enhanced to show more source types)
-      const srcUl = $('#sc-sources'); clear(srcUl);
+      // Scenario Sources
+      const srcUl = $('#sc-sources'); 
+      clear(srcUl);
       const sources = Array.isArray(sc.sources) ? sc.sources : [];
       
-      // If no direct sources, try to extract from citations related to this scenario
       if (sources.length === 0 && REPORT.enhanced_citations) {
         const scenarioKeywords = (sc.title || '').toLowerCase().split(' ').slice(0, 3);
         const relatedCitations = REPORT.enhanced_citations.filter(citation => {
           const claimText = (citation.claim_text || '').toLowerCase();
           return scenarioKeywords.some(keyword => keyword.length > 3 && claimText.includes(keyword));
-        }).slice(0, 5); // Limit to 5 most relevant
+        }).slice(0, 5);
         
         relatedCitations.forEach(citation => {
           const li = document.createElement('li');
@@ -628,7 +723,6 @@ const html = `<!doctype html>
             li.textContent = title.length > 80 ? title.substring(0, 80) + '...' : title;
           }
           
-          // Add source metadata
           const metaDiv = document.createElement('div');
           metaDiv.className = 'citation-meta';
           const metaItems = [];
@@ -642,11 +736,9 @@ const html = `<!doctype html>
           srcUl.appendChild(li);
         });
       } else {
-        // Use direct sources
         sources.forEach(s => {
           const li = document.createElement('li');
           if (typeof s === 'string') {
-            // Check if it's a URL
             if (s.startsWith('http')) {
               const a = makeEl('a', {href: s, target: '_blank', rel: 'noopener'}, s);
               li.appendChild(a);
@@ -663,7 +755,6 @@ const html = `<!doctype html>
         });
       }
       
-      // If still no sources, show a helpful message
       if (srcUl.children.length === 0) {
         const li = makeEl('li', {}, 'No specific sources available for this scenario');
         li.style.fontStyle = 'italic';
@@ -673,13 +764,13 @@ const html = `<!doctype html>
     }
 
     function renderConsolidatedSources(){
-      const body = $('#consolidated-sources tbody'); clear(body);
-      // Merge both arrays, dedupe by title+url, then sort by authority desc then date desc
+      const body = $('#consolidated-sources tbody'); 
+      clear(body);
       const merged = []
         .concat(Array.isArray(REPORT.enhanced_citations)?REPORT.enhanced_citations:[])
         .concat(Array.isArray(REPORT.data_sources_table)?REPORT.data_sources_table:[]);
       const byKey = new Map();
-      const domainFrom = (u)=>{ try{ return new URL(u).hostname.replace(/^www\./i,'').toLowerCase(); }catch{ return ''; } };
+      const domainFrom = (u)=>{ try{ return new URL(u).hostname.replace(/^www\\./i,'').toLowerCase(); }catch{ return ''; } };
       merged.forEach(s=>{
         const title = s.claim_text || s.title || s.name || '';
         const url = s.source_url || s.url || '';
@@ -717,15 +808,19 @@ const html = `<!doctype html>
 
     // Initialize
     (function init(){
-      renderH2H();
-      populateScenarioSelector();
-      renderScenario(0);
-      renderConsolidatedSources();
-      document.getElementById('scenario-select').addEventListener('change', (e)=>{
-        const idx = parseInt(e.target.value,10) || 0;
-        renderScenario(idx);
-        document.getElementById('scenario-block').scrollIntoView({behavior:'smooth', block:'start'});
-      });
+      try {
+        renderH2H();
+        populateScenarioSelector();
+        renderScenario(0);
+        renderConsolidatedSources();
+        document.getElementById('scenario-select').addEventListener('change', (e)=>{
+          const idx = parseInt(e.target.value,10) || 0;
+          renderScenario(idx);
+          document.getElementById('scenario-block').scrollIntoView({behavior:'smooth', block:'start'});
+        });
+      } catch (error) {
+        console.error('Error initializing report:', error);
+      }
     })();
   </script>
 </body>
