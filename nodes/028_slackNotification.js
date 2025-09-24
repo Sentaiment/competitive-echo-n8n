@@ -7,8 +7,7 @@ const inputData = $input.all();
 
 // Configuration - UPDATE THESE VALUES FOR YOUR SLACK SETUP
 const SLACK_CONFIG = {
-  webhookUrl:
-    "https://hooks.slack.com/services/YOUR_WEBHOOK_URL_HERE",
+  webhookUrl: process.env.SLACK_WEBHOOK_URL || "https://hooks.slack.com/services/YOUR_WEBHOOK_URL_HERE",
   channel: "#competitive-analysis",
   username: "Competitive Echo Bot",
   iconEmoji: ":chart_with_upwards_trend:",
