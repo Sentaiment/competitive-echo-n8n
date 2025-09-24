@@ -84,11 +84,13 @@ The workflow consists of several key nodes:
 ## 🚀 Deployment
 
 ### Local Development
+
 ```bash
 n8n start
 ```
 
 ### Cloud Deployment
+
 - Export workflow from local n8n
 - Import to n8n Cloud or your preferred platform
 - Update environment variables in cloud environment
@@ -106,16 +108,19 @@ n8n start
 ### Common Issues
 
 **GitHub Push Protection Error**: If you get a "Push cannot contain secrets" error:
+
 - Ensure `.env` is in your `.gitignore`
 - Check that no hardcoded URLs are in your code
 - Use environment variables for all sensitive data
 
 **Slack Notifications Not Working**:
+
 - Verify your webhook URL in `.env`
 - Check that the Slack app has proper permissions
 - Test the webhook URL manually
 
 **Empty Reports**:
+
 - Check that input data is properly formatted
 - Verify company name extraction logic
 - Review console logs for errors
