@@ -1,1 +1,1 @@
-https://hooks.slack.com/services/YOUR_WEBHOOK_URL_HERE=>https://hooks.slack.com/services/YOUR_WEBHOOK_URL_HERE
+SLACK_WEBHOOK_URL=>{{$env.SLACK_WEBHOOK_URL}}
